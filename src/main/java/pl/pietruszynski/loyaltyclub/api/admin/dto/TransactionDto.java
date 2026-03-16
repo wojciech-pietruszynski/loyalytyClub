@@ -12,4 +12,5 @@ public class TransactionDto {
     private Integer points;
     private String description;
     private LocalDateTime timestamp;
+    private LocalDateTime availableFrom;
 }

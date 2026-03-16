@@ -1,0 +1,4 @@
+interface:
+  display_name: "React Code Reviewer"
+  short_description: "Review React UI quality and risks"
+  default_prompt: "Use $react-code-reviewer to review React UI changes for risks and quality."

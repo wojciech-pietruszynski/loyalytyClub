@@ -1,0 +1,4 @@
+interface:
+  display_name: "React i18n Auditor"
+  short_description: "Audit UI for i18n readiness"
+  default_prompt: "Use $react-i18n-auditor to audit React UI changes for i18n readiness."

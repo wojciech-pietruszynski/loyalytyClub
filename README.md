@@ -31,12 +31,27 @@ docker-compose up -d
 ```
 
 ### 2. Budowa całego projektu (Maven)
-Polecenie to zainstaluje Node.js, pobierze zależności frontendu, zbuduje go, skopiuje pliki do backendu i skompiluje aplikację Java:
+Polecenie to zainstaluje Node.js, pobierze zależności frontendu, uruchomi testy frontendu, zbuduje go, skopiuje pliki do backendu i skompiluje aplikację Java:
 ```bash
-mvn clean install -DskipTests
+mvn -Pbuild-frontend clean test package
 ```
 
-### 3. Uruchomienie aplikacji
+### 3. Osobne kroki build
+
+Backend:
+```bash
+mvn -Pbuild-backend clean test package
+```
+Ten krok kompiluje i pakuje aplikację Spring Boot oraz uruchamia testy jednostkowe backendu.
+
+Frontend:
+```bash
+mvn -Pbuild-frontend clean test package
+```
+Ten krok instaluje zależności frontendu, uruchamia testy jednostkowe frontendu, buduje aplikację frontendową i kopiuje wynik do zasobów statycznych backendu.
+Wynik buildu trafia do `src/main/resources/static`, a następnie do `target/classes/static` na potrzeby pakowania artefaktu Spring Boot.
+
+### 4. Uruchomienie aplikacji
 Po zakończeniu buildu uruchom plik JAR:
 ```bash
 java -jar target/loyalty-club-0.0.1-SNAPSHOT.jar
@@ -59,7 +74,7 @@ Aplikacja będzie dostępna pod adresem: **[http://localhost:8080](http://localh
 ## 📂 Struktura Projektu
 
 - `/src/main/java/...` - Kod źródłowy Spring Boot (Moel, Controller, Service).
-- `/src/main/resources/static` - (Generowane) Skompilowane pliki Frontendu.
+- `/src/main/resources/static` - (Generowane) Skompilowane pliki Frontendu używane przez backend.
 - `/frontend` - Kod źródłowy React + TS.
 - `/ai_tool` - Dokumentacja procesowa i changelog.
 

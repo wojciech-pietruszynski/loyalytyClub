@@ -15,6 +15,10 @@
     <description>Loyalty Program Application</description>
     <properties>
         <java.version>21</java.version>
+        <frontend-maven-plugin.version>1.15.0</frontend-maven-plugin.version>
+        <frontend.workingDirectory>frontend</frontend.workingDirectory>
+        <frontend.installDirectory>target</frontend.installDirectory>
+        <frontend.resourcesDirectory>src/main/resources/static</frontend.resourcesDirectory>
     </properties>
     <dependencies>
         <dependency>
@@ -85,73 +89,129 @@
                     </excludes>
                 </configuration>
             </plugin>
-
-            <!-- Frontend Maven Plugin -->
-            <plugin>
-                <groupId>com.github.eirslett</groupId>
-                <artifactId>frontend-maven-plugin</artifactId>
-                <version>1.15.0</version>
-                <configuration>
-                    <workingDirectory>frontend</workingDirectory>
-                    <installDirectory>target</installDirectory>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>install node and npm</id>
-                        <phase>generate-resources</phase>
-                        <goals>
-                            <goal>install-node-and-npm</goal>
-                        </goals>
-                        <configuration>
-                            <nodeVersion>v20.19.0</nodeVersion>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>npm ci</id>
-                        <phase>generate-resources</phase>
-                        <goals>
-                            <goal>npm</goal>
-                        </goals>
-                        <configuration>
-                            <arguments>ci</arguments>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>npm run build</id>
-                        <phase>generate-resources</phase>
-                        <goals>
-                            <goal>npm</goal>
-                        </goals>
-                        <configuration>
-                            <arguments>run build</arguments>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <!-- Copy frontend build to static -->
-            <plugin>
-                <artifactId>maven-resources-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>copy-frontend-dist-to-static</id>
-                        <phase>process-resources</phase>
-                        <goals>
-                            <goal>copy-resources</goal>
-                        </goals>
-                        <configuration>
-                            <outputDirectory>${project.build.outputDirectory}/static</outputDirectory>
-                            <resources>
-                                <resource>
-                                    <directory>frontend/dist</directory>
-                                    <filtering>false</filtering>
-                                </resource>
-                            </resources>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>build-backend</id>
+        </profile>
+
+        <profile>
+            <id>build-frontend</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.github.eirslett</groupId>
+                        <artifactId>frontend-maven-plugin</artifactId>
+                        <version>${frontend-maven-plugin.version}</version>
+                        <configuration>
+                            <workingDirectory>${frontend.workingDirectory}</workingDirectory>
+                            <installDirectory>${frontend.installDirectory}</installDirectory>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>install-node-and-npm</id>
+                                <phase>generate-resources</phase>
+                                <goals>
+                                    <goal>install-node-and-npm</goal>
+                                </goals>
+                                <configuration>
+                                    <nodeVersion>v20.19.0</nodeVersion>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>npm-ci</id>
+                                <phase>generate-resources</phase>
+                                <goals>
+                                    <goal>npm</goal>
+                                </goals>
+                                <configuration>
+                                    <arguments>ci</arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>npm-test</id>
+                                <phase>test</phase>
+                                <goals>
+                                    <goal>npm</goal>
+                                </goals>
+                                <configuration>
+                                    <arguments>run test</arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>npm-build</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>npm</goal>
+                                </goals>
+                                <configuration>
+                                    <arguments>run build</arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <plugin>
+                        <artifactId>maven-antrun-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>clean-generated-frontend-static</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+                                <configuration>
+                                    <target>
+                                        <delete dir="${frontend.resourcesDirectory}"/>
+                                        <mkdir dir="${frontend.resourcesDirectory}"/>
+                                    </target>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <plugin>
+                        <artifactId>maven-resources-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>copy-frontend-dist-to-resources-static</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>copy-resources</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${frontend.resourcesDirectory}</outputDirectory>
+                                    <resources>
+                                        <resource>
+                                            <directory>${frontend.workingDirectory}/dist</directory>
+                                            <filtering>false</filtering>
+                                        </resource>
+                                    </resources>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>copy-frontend-dist-to-target-static</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>copy-resources</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${project.build.outputDirectory}/static</outputDirectory>
+                                    <resources>
+                                        <resource>
+                                            <directory>${frontend.resourcesDirectory}</directory>
+                                            <filtering>false</filtering>
+                                        </resource>
+                                    </resources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

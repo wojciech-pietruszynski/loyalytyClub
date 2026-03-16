@@ -58,7 +58,7 @@ public class LoyaltyController {
     }
 
     @GetMapping("/store-promotions")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICAL')")
     public List<StorePromotionDto> getStorePromotions(Authentication authentication) {
         return loyaltyService.getStorePromotions(getCountryScope(authentication)).stream()
                 .map(this::mapToStorePromotionDto)
@@ -66,19 +66,19 @@ public class LoyaltyController {
     }
 
     @PostMapping("/store-promotions")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICAL')")
     public StorePromotionDto createStorePromotion(@Valid @RequestBody StorePromotionCreateRequest request, Authentication authentication) {
         return mapToStorePromotionDto(loyaltyService.createStorePromotion(request, getCountryScope(authentication)));
     }
 
     @PutMapping("/store-promotions/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICAL')")
     public StorePromotionDto updateStorePromotion(@PathVariable Long id, @Valid @RequestBody StorePromotionCreateRequest request, Authentication authentication) {
         return mapToStorePromotionDto(loyaltyService.updateStorePromotion(id, request, getCountryScope(authentication)));
     }
 
     @PatchMapping("/store-promotions/{id}/status")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICAL')")
     public StorePromotionDto setStorePromotionStatus(@PathVariable Long id, @Valid @RequestBody StorePromotionStatusRequest request, Authentication authentication) {
         return mapToStorePromotionDto(loyaltyService.setStorePromotionEnabled(id, request.enabled(), getCountryScope(authentication)));
     }
@@ -217,6 +217,7 @@ public class LoyaltyController {
                 .points(transaction.getPoints())
                 .description(transaction.getDescription())
                 .timestamp(transaction.getTimestamp())
+                .availableFrom(transaction.getAvailableFrom())
                 .build();
     }
 
