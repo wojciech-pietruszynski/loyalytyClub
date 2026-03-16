@@ -1,0 +1,4 @@
+interface:
+  display_name: "React Test Architect"
+  short_description: "Write RTL/Vitest tests for UI"
+  default_prompt: "Use $react-test-architect to add RTL/Vitest tests for new React UI."
