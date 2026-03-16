@@ -1,0 +1,25 @@
+CREATE TABLE admin_users (
+    id BIGSERIAL PRIMARY KEY,
+    username VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE store_users (
+    id BIGSERIAL PRIMARY KEY,
+    username VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE ecom_users (
+    id BIGSERIAL PRIMARY KEY,
+    username VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE coupon_prefixes (
+    id BIGSERIAL PRIMARY KEY,
+    value VARCHAR(20) NOT NULL UNIQUE
+);

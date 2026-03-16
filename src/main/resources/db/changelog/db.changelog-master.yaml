@@ -1,0 +1,541 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001-create-auth-and-config-tables
+      author: codex
+      changes:
+        - createTable:
+            tableName: admin_users
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: username
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: password
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+        - createTable:
+            tableName: store_users
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: username
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: password
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+        - createTable:
+            tableName: ecom_users
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: username
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: password
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+        - createTable:
+            tableName: coupon_prefixes
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: value
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+                    unique: true
+
+  - changeSet:
+      id: 002-create-base-country-tables
+      author: codex
+      changes:
+        - createTable:
+            tableName: customers
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: first_name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: last_name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: email
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: customer_number
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: phone_number
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: country
+                  type: VARCHAR(3)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: loyalty_points
+                  type: INTEGER
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+        - createTable:
+            tableName: coupon_templates
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: coupon_value
+                  type: DECIMAL(12,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: minimum_purchase_value
+                  type: DECIMAL(12,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: required_points
+                  type: INTEGER
+                  constraints:
+                    nullable: false
+              - column:
+                  name: country
+                  type: VARCHAR(3)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: validity_days
+                  type: INTEGER
+                  constraints:
+                    nullable: false
+              - column:
+                  name: coupon_prefix
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+        - createTable:
+            tableName: customer_coupons
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: coupon_code
+                  type: VARCHAR(40)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: country
+                  type: VARCHAR(3)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: customer_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: coupon_template_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: reason
+                  type: VARCHAR(30)
+                  defaultValue: POINTS_EXCHANGE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+                  defaultValue: ACTIVE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: issued_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: expires_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+        - createTable:
+            tableName: transactions
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: customer_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: points
+                  type: INTEGER
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: country
+                  type: VARCHAR(3)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: timestamp
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+        - createTable:
+            tableName: technical_users
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: username
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: password
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: password_preview
+                  type: VARCHAR(255)
+                  defaultValue: ""
+                  constraints:
+                    nullable: false
+              - column:
+                  name: country
+                  type: VARCHAR(3)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+
+  - changeSet:
+      id: 003-add-base-indexes
+      author: codex
+      changes:
+        - createIndex:
+            tableName: customers
+            indexName: idx_customers_email
+            columns:
+              - column:
+                  name: email
+        - createIndex:
+            tableName: customers
+            indexName: idx_customers_customer_number
+            columns:
+              - column:
+                  name: customer_number
+        - createIndex:
+            tableName: customers
+            indexName: idx_customers_country
+            columns:
+              - column:
+                  name: country
+        - createIndex:
+            tableName: coupon_templates
+            indexName: idx_coupon_templates_country
+            columns:
+              - column:
+                  name: country
+        - createIndex:
+            tableName: customer_coupons
+            indexName: idx_customer_coupons_customer_id
+            columns:
+              - column:
+                  name: customer_id
+        - createIndex:
+            tableName: customer_coupons
+            indexName: idx_customer_coupons_issued_at
+            columns:
+              - column:
+                  name: issued_at
+        - createIndex:
+            tableName: transactions
+            indexName: idx_transactions_customer_id_timestamp
+            columns:
+              - column:
+                  name: customer_id
+              - column:
+                  name: timestamp
+        - addForeignKeyConstraint:
+            baseTableName: customer_coupons
+            baseColumnNames: customer_id
+            referencedTableName: customers
+            referencedColumnNames: id
+            constraintName: fk_customer_coupons_customer
+        - addForeignKeyConstraint:
+            baseTableName: customer_coupons
+            baseColumnNames: coupon_template_id
+            referencedTableName: coupon_templates
+            referencedColumnNames: id
+            constraintName: fk_customer_coupons_template
+        - addForeignKeyConstraint:
+            baseTableName: transactions
+            baseColumnNames: customer_id
+            referencedTableName: customers
+            referencedColumnNames: id
+            constraintName: fk_transactions_customer
+
+  - changeSet:
+      id: 005-backfill-missing-columns-for-existing-dev-db
+      author: codex
+      changes:
+        - sql:
+            splitStatements: false
+            sql: |
+              ALTER TABLE technical_users
+              ADD COLUMN IF NOT EXISTS password_preview VARCHAR(255) NOT NULL DEFAULT '';
+
+              ALTER TABLE transactions
+              ADD COLUMN IF NOT EXISTS country VARCHAR(3);
+
+              UPDATE transactions t
+              SET country = c.country
+              FROM customers c
+              WHERE t.customer_id = c.id
+                AND (t.country IS NULL OR btrim(t.country) = '');
+
+              UPDATE transactions
+              SET country = 'PL'
+              WHERE country IS NULL OR btrim(country) = '';
+
+              ALTER TABLE transactions
+              ALTER COLUMN country SET NOT NULL;
+
+              ALTER TABLE customer_coupons
+              ADD COLUMN IF NOT EXISTS country VARCHAR(3);
+
+              UPDATE customer_coupons cc
+              SET country = ct.country
+              FROM coupon_templates ct
+              WHERE cc.coupon_template_id = ct.id
+                AND (cc.country IS NULL OR btrim(cc.country) = '');
+
+              UPDATE customer_coupons
+              SET country = 'PL'
+              WHERE country IS NULL OR btrim(country) = '';
+
+              ALTER TABLE customer_coupons
+              ALTER COLUMN country SET NOT NULL;
+
+  - changeSet:
+      id: 006-store-transaction-lifecycle-and-promotions
+      author: codex
+      changes:
+        - addColumn:
+            tableName: transactions
+            columns:
+              - column:
+                  name: amount
+                  type: DECIMAL(12,2)
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: points_per_currency
+                  type: DECIMAL(8,2)
+                  defaultValueNumeric: 1
+                  constraints:
+                    nullable: false
+              - column:
+                  name: type
+                  type: VARCHAR(30)
+                  defaultValue: MANUAL_ADJUSTMENT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: state
+                  type: VARCHAR(20)
+                  defaultValue: AVAILABLE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: purchase_timestamp
+                  type: TIMESTAMP
+              - column:
+                  name: available_from
+                  type: TIMESTAMP
+              - column:
+                  name: expires_at
+                  type: TIMESTAMP
+              - column:
+                  name: source_transaction_id
+                  type: BIGINT
+        - sql:
+            splitStatements: false
+            sql: |
+              UPDATE transactions
+              SET purchase_timestamp = COALESCE(purchase_timestamp, timestamp),
+                  available_from = COALESCE(available_from, timestamp),
+                  expires_at = COALESCE(expires_at, timestamp + INTERVAL '365 days');
+
+              ALTER TABLE transactions ALTER COLUMN purchase_timestamp SET NOT NULL;
+              ALTER TABLE transactions ALTER COLUMN available_from SET NOT NULL;
+              ALTER TABLE transactions ALTER COLUMN expires_at SET NOT NULL;
+        - addForeignKeyConstraint:
+            baseTableName: transactions
+            baseColumnNames: source_transaction_id
+            referencedTableName: transactions
+            referencedColumnNames: id
+            constraintName: fk_transactions_source_transaction
+        - createIndex:
+            tableName: transactions
+            indexName: idx_transactions_source_transaction_id
+            columns:
+              - column:
+                  name: source_transaction_id
+        - createTable:
+            tableName: store_points_promotions
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: country
+                  type: VARCHAR(3)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: points_per_currency
+                  type: DECIMAL(8,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: starts_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ends_at
+                  type: TIMESTAMP
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: store_points_promotions
+            indexName: idx_store_points_promotions_country_starts_at
+            columns:
+              - column:
+                  name: country
+              - column:
+                  name: starts_at

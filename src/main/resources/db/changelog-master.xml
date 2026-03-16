@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    logicalFilePath="db/changelog/db.changelog-master.yaml"
+    xsi:schemaLocation="
+      http://www.liquibase.org/xml/ns/dbchangelog
+      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="001-create-auth-and-config-tables" author="codex">
+        <sqlFile path="migrations/001_schema_init_auth.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="002-create-base-country-tables" author="codex">
+        <sqlFile path="migrations/002_schema_init_core.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="003-add-base-indexes" author="codex">
+        <sqlFile path="migrations/003_indexes_and_base_constraints.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="005-backfill-missing-columns-for-existing-dev-db" author="codex">
+        <sqlFile path="migrations/005_backfill_missing_columns.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="006-store-transaction-lifecycle-and-promotions" author="codex">
+        <sqlFile path="migrations/006_store_transaction_lifecycle_and_promotions.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="007-store-transaction-source-number" author="codex">
+        <sqlFile path="migrations/007_store_transaction_source_number.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="008-coupon-redemption-idempotency" author="codex">
+        <sqlFile path="migrations/008_coupon_redemption_idempotency.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+</databaseChangeLog>
