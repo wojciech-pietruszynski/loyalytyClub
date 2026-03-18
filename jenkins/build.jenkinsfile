@@ -5,6 +5,7 @@ pipeline {
         JAVA_HOME = '/usr/lib/jvm/java-21-openjdk-amd64'
         PATH = "${JAVA_HOME}/bin:${env.PATH}"
         TARGET_DIR = '/home/wojciech/loyalty-club-builds'
+        ARCHIVE_DIR = "${TARGET_DIR}/archive"
     }
 
     stages {
@@ -17,9 +18,35 @@ pipeline {
         stage('Budowanie Fullstack (Maven)') {
             steps {
                 echo '==== Rozpoczynam budowanie z profilem build-frontend ===='
-                // Uruchamiamy Mavena z profilem -P build-frontend
-                // -DskipTests pominie testy Javy oraz testy NPM (faza test w pluginie)
                 sh 'mvn clean package -P build-frontend -DskipTests'
+            }
+        }
+
+        stage('Zatrzymanie i Archiwizacja') {
+            steps {
+                echo '==== Zatrzymywanie starej wersji i archiwizacja ===='
+                // Używamy bloku z trzema pojedynczymi apostrofami ('''),
+                // aby Jenkins przekazał te zmienne do basha bez ewaluacji w Groovy.
+                sh '''
+                    # 1. Zatrzymanie poprzedniego procesu (jeśli istnieje)
+                    echo "Szukam i zatrzymuję proces loyaltyClub.jar..."
+                    pkill -f "loyaltyClub.jar" || echo "Brak uruchomionego procesu, idę dalej."
+
+                    # Opcjonalnie: dajemy systemowi sekundę na zwolnienie zasobów (np. portu)
+                    sleep 2
+
+                    # 2. Tworzenie folderu archiwum (jeśli nie istnieje)
+                    mkdir -p ${ARCHIVE_DIR}
+
+                    # 3. Archiwizacja pliku JAR z datą i godziną
+                    if [ -f "${TARGET_DIR}/loyaltyClub.jar" ]; then
+                        TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+                        mv ${TARGET_DIR}/loyaltyClub.jar ${ARCHIVE_DIR}/loyaltyClub_${TIMESTAMP}.jar
+                        echo "Stary plik JAR zarchiwizowany jako loyaltyClub_${TIMESTAMP}.jar"
+                    else
+                        echo "Brak poprzedniego pliku JAR do zarchiwizowania."
+                    fi
+                '''
             }
         }
 
@@ -29,13 +56,25 @@ pipeline {
                 sh 'cp target/*.jar ${TARGET_DIR}/loyaltyClub.jar'
             }
         }
+
+        stage('Uruchomienie Aplikacji') {
+            steps {
+                echo '==== Uruchamianie nowej wersji w tle ===='
+                sh '''
+                    # JENKINS_NODE_COOKIE=dontKillMe jest kluczowe!
+                    # Zapobiega to domyślnemu zachowaniu Jenkinsa, który ubija
+                    # wszystkie procesy potomne po zakończeniu zadania.
+
+                    JENKINS_NODE_COOKIE=dontKillMe nohup java -jar ${TARGET_DIR}/loyaltyClub.jar > ${TARGET_DIR}/application.log 2>&1 &
+                    echo "Aplikacja wystartowała. Logi są zapisywane do ${TARGET_DIR}/application.log"
+                '''
+            }
+        }
     }
 
     post {
         success {
-            echo "==== SUKCES: Nowa wersja aplikacji wraz z frontendem czeka w ${TARGET_DIR} ===="
-            // Opcjonalnie: automatyczny restart serwisu po wdrożeniu nowej paczki
-            // sh 'sudo systemctl restart loyalty-club'
+            echo "==== SUKCES: Nowa wersja aplikacji została wdrożona i uruchomiona w ${TARGET_DIR} ===="
         }
         failure {
             echo "==== BŁĄD: Coś poszło nie tak podczas budowania. Sprawdź logi. ===="
