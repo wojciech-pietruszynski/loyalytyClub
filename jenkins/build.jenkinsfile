@@ -1,0 +1,46 @@
+pipeline {
+    agent any
+
+    // Zmienne środowiskowe dostępne w każdym kroku pipeline'u
+    environment {
+        JAVA_HOME = '/usr/lib/jvm/java-21-openjdk-amd64'
+        PATH = "${JAVA_HOME}/bin:${env.PATH}"
+        TARGET_DIR = '/home/wojciech/loyalty-club-builds'
+    }
+
+    stages {
+        stage('Pobranie kodu') {
+            steps {
+                // Deklaratywny pipeline zazwyczaj sam pobiera kod,
+                // ale ten krok upewnia nas, że mamy najświeższą wersję i branch.
+                checkout scm
+            }
+        }
+
+        stage('Budowanie (Maven)') {
+            steps {
+                echo '==== Rozpoczynam budowanie projektu (Java 21) ===='
+                // Uruchamiamy Mavena w trybie powłoki (shell)
+                sh 'mvn clean package -DskipTests'
+            }
+        }
+
+        stage('Kopiowanie (Deploy)') {
+            steps {
+                echo '==== Kopiowanie pliku .jar do folderu uzytkownika ===='
+                // Skrypt przenoszący zbudowany plik w wyznaczone miejsce
+                sh 'cp target/*.jar ${TARGET_DIR}/loyaltyClub.jar'
+            }
+        }
+    }
+
+    // Blok 'post' wykonuje się po zakończeniu wszystkich stage'y
+    post {
+        success {
+            echo "==== SUKCES: Nowa wersja aplikacji czeka w ${TARGET_DIR} ===="
+        }
+        failure {
+            echo "==== BŁĄD: Coś poszło nie tak podczas budowania. Sprawdź logi. ===="
+        }
+    }
+}
