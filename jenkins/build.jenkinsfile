@@ -1,7 +1,6 @@
 pipeline {
     agent any
 
-    // Zmienne środowiskowe dostępne w każdym kroku pipeline'u
     environment {
         JAVA_HOME = '/usr/lib/jvm/java-21-openjdk-amd64'
         PATH = "${JAVA_HOME}/bin:${env.PATH}"
@@ -11,33 +10,32 @@ pipeline {
     stages {
         stage('Pobranie kodu') {
             steps {
-                // Deklaratywny pipeline zazwyczaj sam pobiera kod,
-                // ale ten krok upewnia nas, że mamy najświeższą wersję i branch.
                 checkout scm
             }
         }
 
-        stage('Budowanie (Maven)') {
+        stage('Budowanie Fullstack (Maven)') {
             steps {
-                echo '==== Rozpoczynam budowanie projektu (Java 21) ===='
-                // Uruchamiamy Mavena w trybie powłoki (shell)
-                sh 'mvn clean package -DskipTests'
+                echo '==== Rozpoczynam budowanie z profilem build-frontend ===='
+                // Uruchamiamy Mavena z profilem -P build-frontend
+                // -DskipTests pominie testy Javy oraz testy NPM (faza test w pluginie)
+                sh 'mvn clean package -P build-frontend -DskipTests'
             }
         }
 
         stage('Kopiowanie (Deploy)') {
             steps {
-                echo '==== Kopiowanie pliku .jar do folderu uzytkownika ===='
-                // Skrypt przenoszący zbudowany plik w wyznaczone miejsce
+                echo '==== Kopiowanie gotowego pliku .jar ===='
                 sh 'cp target/*.jar ${TARGET_DIR}/loyaltyClub.jar'
             }
         }
     }
 
-    // Blok 'post' wykonuje się po zakończeniu wszystkich stage'y
     post {
         success {
-            echo "==== SUKCES: Nowa wersja aplikacji czeka w ${TARGET_DIR} ===="
+            echo "==== SUKCES: Nowa wersja aplikacji wraz z frontendem czeka w ${TARGET_DIR} ===="
+            // Opcjonalnie: automatyczny restart serwisu po wdrożeniu nowej paczki
+            // sh 'sudo systemctl restart loyalty-club'
         }
         failure {
             echo "==== BŁĄD: Coś poszło nie tak podczas budowania. Sprawdź logi. ===="
