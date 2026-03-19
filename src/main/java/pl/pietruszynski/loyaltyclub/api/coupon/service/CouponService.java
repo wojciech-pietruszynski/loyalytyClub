@@ -27,14 +27,16 @@ import pl.pietruszynski.loyaltyclub.api.coupon.repository.CouponRedemptionReques
 import pl.pietruszynski.loyaltyclub.exception.ResourceNotFoundException;
 
 import java.math.BigDecimal;
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Locale;
-import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class CouponService {
+
+    private final SecureRandom secureRandom = new SecureRandom();
 
     private final CustomerRepository customerRepository;
     private final CouponTemplateRepository couponTemplateRepository;
@@ -211,7 +213,7 @@ public class CouponService {
     private String generateElevenDigits() {
         StringBuilder digits = new StringBuilder(11);
         for (int i = 0; i < 11; i++) {
-            digits.append(ThreadLocalRandom.current().nextInt(10));
+            digits.append(secureRandom.nextInt(10));
         }
         return digits.toString();
     }

@@ -32,13 +32,13 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 @Service
@@ -47,6 +47,8 @@ import java.util.stream.Collectors;
 public class LoyaltyService {
 
     private static final String COUNTRY_NOT_ALLOWED = "Country code is not allowed";
+
+    private final SecureRandom secureRandom = new SecureRandom();
 
     private final CustomerRepository customerRepository;
     private final TransactionRepository transactionRepository;
@@ -585,7 +587,7 @@ public class LoyaltyService {
     private String generateElevenDigits() {
         StringBuilder digits = new StringBuilder(11);
         for (int i = 0; i < 11; i++) {
-            digits.append(ThreadLocalRandom.current().nextInt(10));
+            digits.append(secureRandom.nextInt(10));
         }
         return digits.toString();
     }
