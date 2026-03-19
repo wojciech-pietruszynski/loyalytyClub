@@ -87,6 +87,16 @@ function App() {
   const promoApi = usePromotions();
   const techApi = useTechnicalUsers();
 
+  // Sync theme & language to DOM / localStorage whenever they change
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    window.localStorage.setItem('app_theme', theme);
+  }, [theme]);
+
+  useEffect(() => {
+    window.localStorage.setItem('app_language', language);
+  }, [language]);
+
   // Translations
   const t = useCallback((key: TranslationKey, params?: Record<string, string | number>) => translate(language, key, params), [language]);
 
@@ -368,8 +378,8 @@ function App() {
                   name: p.name,
                   country: p.country,
                   pointsPerCurrency: p.pointsPerCurrency.toString(),
-                  startsAt: p.startsAt.split('T')[0],
-                  endsAt: p.endsAt ? p.endsAt.split('T')[0] : '',
+                  startsAt: p.startsAt.slice(0, 16),
+                  endsAt: p.endsAt ? p.endsAt.slice(0, 16) : '',
                   enabled: p.enabled
                 });
                 setPromotionView('create');
