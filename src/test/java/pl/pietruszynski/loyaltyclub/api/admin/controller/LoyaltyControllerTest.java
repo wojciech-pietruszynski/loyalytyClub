@@ -1,0 +1,404 @@
+package pl.pietruszynski.loyaltyclub.api.admin.controller;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration;
+import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.web.servlet.MockMvc;
+import pl.pietruszynski.loyaltyclub.api.admin.dto.*;
+import pl.pietruszynski.loyaltyclub.api.admin.model.*;
+import pl.pietruszynski.loyaltyclub.api.admin.security.AdminUserDetailsService;
+import pl.pietruszynski.loyaltyclub.api.admin.security.JwtService;
+import pl.pietruszynski.loyaltyclub.api.admin.service.LoyaltyService;
+import pl.pietruszynski.loyaltyclub.api.admin.service.TechnicalUserService;
+import pl.pietruszynski.loyaltyclub.api.ecom.security.EcomUserDetailsService;
+import pl.pietruszynski.loyaltyclub.api.store.model.StorePointsPromotion;
+import pl.pietruszynski.loyaltyclub.api.store.security.StoreUserDetailsService;
+
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.util.List;
+
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@WebMvcTest(value = LoyaltyController.class,
+        excludeAutoConfiguration = {SecurityAutoConfiguration.class,
+                SecurityFilterAutoConfiguration.class,
+                UserDetailsServiceAutoConfiguration.class})
+class LoyaltyControllerTest {
+
+    @Autowired MockMvc mockMvc;
+    @Autowired ObjectMapper objectMapper;
+    @MockBean LoyaltyService loyaltyService;
+    @MockBean TechnicalUserService technicalUserService;
+    @MockBean JwtService jwtService;
+    @MockBean AdminUserDetailsService adminUserDetailsService;
+    @MockBean StoreUserDetailsService storeUserDetailsService;
+    @MockBean EcomUserDetailsService ecomUserDetailsService;
+
+    // -----------------------------------------------------------------------
+    // GET /api/admin/customers
+    // -----------------------------------------------------------------------
+
+    @Test
+    void getAllCustomers_shouldReturnList() throws Exception {
+        Customer c = customer(1L, "jan@pl.com", "PL");
+        when(loyaltyService.getAllCustomers(null)).thenReturn(List.of(c));
+
+        mockMvc.perform(get("/api/admin/customers"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].email").value("jan@pl.com"));
+    }
+
+    // -----------------------------------------------------------------------
+    // GET /api/admin/config/countries
+    // -----------------------------------------------------------------------
+
+    @Test
+    void getAvailableCountries_shouldReturnCodes() throws Exception {
+        when(loyaltyService.getAvailableCountryCodes(null)).thenReturn(List.of("PL", "DE"));
+
+        mockMvc.perform(get("/api/admin/config/countries"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").value("PL"));
+    }
+
+    // -----------------------------------------------------------------------
+    // GET /api/admin/config/coupon-prefixes
+    // -----------------------------------------------------------------------
+
+    @Test
+    void getCouponPrefixes_shouldReturnPrefixes() throws Exception {
+        when(loyaltyService.getCouponPrefixes()).thenReturn(List.of("BONUS", "SALE"));
+
+        mockMvc.perform(get("/api/admin/config/coupon-prefixes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").value("BONUS"));
+    }
+
+    // -----------------------------------------------------------------------
+    // POST /api/admin/customers
+    // -----------------------------------------------------------------------
+
+    @Test
+    void createCustomer_valid_shouldReturn200() throws Exception {
+        Customer saved = customer(1L, "new@pl.com", "PL");
+        when(loyaltyService.createCustomer(any(), isNull())).thenReturn(saved);
+
+        CustomerDto dto = CustomerDto.builder()
+                .firstName("Jan").lastName("Kowalski")
+                .email("new@pl.com").customerNumber("C001")
+                .phoneNumber("123456789").country("PL").build();
+
+        mockMvc.perform(post("/api/admin/customers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("new@pl.com"));
+    }
+
+    // -----------------------------------------------------------------------
+    // GET /api/admin/customers/{id}
+    // -----------------------------------------------------------------------
+
+    @Test
+    void getCustomer_existing_shouldReturn200() throws Exception {
+        when(loyaltyService.getCustomerById(1L, null)).thenReturn(customer(1L, "a@pl.com", "PL"));
+
+        mockMvc.perform(get("/api/admin/customers/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1));
+    }
+
+    // -----------------------------------------------------------------------
+    // PUT /api/admin/customers/{id}
+    // -----------------------------------------------------------------------
+
+    @Test
+    void updateCustomer_valid_shouldReturn200() throws Exception {
+        Customer updated = customer(1L, "upd@pl.com", "PL");
+        when(loyaltyService.updateCustomer(eq(1L), any(), isNull())).thenReturn(updated);
+
+        CustomerDto dto = CustomerDto.builder()
+                .firstName("Jan").lastName("Kowalski")
+                .email("upd@pl.com").customerNumber("C001")
+                .phoneNumber("123456789").country("PL").build();
+
+        mockMvc.perform(put("/api/admin/customers/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("upd@pl.com"));
+    }
+
+    // -----------------------------------------------------------------------
+    // GET /api/admin/customers/{id}/transactions
+    // -----------------------------------------------------------------------
+
+    @Test
+    void getCustomerTransactions_shouldReturn200() throws Exception {
+        when(loyaltyService.getTransactionsForCustomer(1L, null)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/admin/customers/1/transactions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
+    }
+
+    @Test
+    void getCustomerTransactions_withData_shouldMapTransactionDto() throws Exception {
+        Customer c = customer(1L, "a@pl.com", "PL");
+        Transaction tx = Transaction.builder()
+                .customer(c).points(50)
+                .amount(BigDecimal.TEN).pointsPerCurrency(BigDecimal.ONE)
+                .description("Store sale: TXN-001").country("PL")
+                .type(TransactionType.SALE).state(TransactionState.AVAILABLE)
+                .purchaseTimestamp(LocalDateTime.now()).availableFrom(LocalDateTime.now().plusDays(30))
+                .expiresAt(LocalDateTime.now().plusDays(365))
+                .build();
+        tx.setId(1L);
+
+        when(loyaltyService.getTransactionsForCustomer(1L, null)).thenReturn(List.of(tx));
+
+        mockMvc.perform(get("/api/admin/customers/1/transactions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].points").value(50))
+                .andExpect(jsonPath("$[0].description").value("Store sale: TXN-001"));
+    }
+
+    // -----------------------------------------------------------------------
+    // GET /api/admin/customers/{id}/coupons
+    // -----------------------------------------------------------------------
+
+    @Test
+    void getCustomerCoupons_shouldReturn200() throws Exception {
+        when(loyaltyService.getCouponsForCustomer(1L, null)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/admin/customers/1/coupons"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
+    }
+
+    // -----------------------------------------------------------------------
+    // POST /api/admin/customers/{id}/add-points
+    // -----------------------------------------------------------------------
+
+    @Test
+    void addPoints_shouldReturn200() throws Exception {
+        PointsRequest req = new PointsRequest(50, "bonus");
+
+        mockMvc.perform(post("/api/admin/customers/1/add-points")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk());
+    }
+
+    // -----------------------------------------------------------------------
+    // GET /api/admin/coupons
+    // -----------------------------------------------------------------------
+
+    @Test
+    void getIssuedCoupons_shouldReturn200() throws Exception {
+        when(loyaltyService.getIssuedCoupons(null)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/admin/coupons"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
+    }
+
+    // -----------------------------------------------------------------------
+    // GET /api/admin/coupon-templates
+    // -----------------------------------------------------------------------
+
+    @Test
+    void getCouponTemplates_shouldReturn200() throws Exception {
+        when(loyaltyService.getCouponTemplates(null)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/admin/coupon-templates"))
+                .andExpect(status().isOk());
+    }
+
+    // -----------------------------------------------------------------------
+    // POST /api/admin/coupon-templates
+    // -----------------------------------------------------------------------
+
+    @Test
+    void createCouponTemplate_valid_shouldReturn200() throws Exception {
+        CouponTemplate template = CouponTemplate.builder()
+                .couponValue(new BigDecimal("10.00"))
+                .minimumPurchaseValue(BigDecimal.ZERO)
+                .requiredPoints(100)
+                .country("PL")
+                .validityDays(30)
+                .couponPrefix("BONUS")
+                .build();
+        template.setId(1L);
+
+        when(loyaltyService.createCouponTemplate(any(), isNull())).thenReturn(template);
+
+        CouponTemplateCreateRequest req = new CouponTemplateCreateRequest(
+                new BigDecimal("10.00"), BigDecimal.ZERO, 100, "PL", 30, "BONUS");
+
+        mockMvc.perform(post("/api/admin/coupon-templates")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.country").value("PL"));
+    }
+
+    // -----------------------------------------------------------------------
+    // POST /api/admin/coupons/issue
+    // -----------------------------------------------------------------------
+
+    @Test
+    void issueCoupon_shouldReturn200() throws Exception {
+        Customer c = customer(1L, "a@pl.com", "PL");
+        CouponTemplate t = CouponTemplate.builder()
+                .couponValue(new BigDecimal("10.00")).minimumPurchaseValue(BigDecimal.ZERO)
+                .requiredPoints(100).country("PL").validityDays(30).couponPrefix("BONUS").build();
+        t.setId(1L);
+
+        CustomerCoupon coupon = CustomerCoupon.builder()
+                .couponCode("BONUS00000000001").country("PL").customer(c).couponTemplate(t)
+                .reason(CouponReason.POINTS_EXCHANGE).status(CouponStatus.ACTIVE)
+                .issuedAt(LocalDateTime.now()).expiresAt(LocalDateTime.now().plusDays(30)).build();
+        coupon.setId(1L);
+
+        when(loyaltyService.issueCoupon(any(), isNull())).thenReturn(coupon);
+
+        CouponIssueRequest req = new CouponIssueRequest(1L, 1L, CouponReason.POINTS_EXCHANGE);
+
+        mockMvc.perform(post("/api/admin/coupons/issue")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.couponCode").value("BONUS00000000001"));
+    }
+
+    // -----------------------------------------------------------------------
+    // GET /api/admin/store-promotions
+    // -----------------------------------------------------------------------
+
+    @Test
+    void getStorePromotions_shouldReturn200() throws Exception {
+        when(loyaltyService.getStorePromotions(null)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/admin/store-promotions"))
+                .andExpect(status().isOk());
+    }
+
+    // -----------------------------------------------------------------------
+    // POST /api/admin/store-promotions
+    // -----------------------------------------------------------------------
+
+    @Test
+    void createStorePromotion_valid_shouldReturn200() throws Exception {
+        StorePointsPromotion promo = StorePointsPromotion.builder()
+                .name("Summer").country("PL")
+                .pointsPerCurrency(new BigDecimal("2.00"))
+                .startsAt(LocalDateTime.now().plusDays(1))
+                .enabled(true).build();
+        promo.setId(1L);
+
+        when(loyaltyService.createStorePromotion(any(), isNull())).thenReturn(promo);
+
+        StorePromotionCreateRequest req = new StorePromotionCreateRequest(
+                "Summer", "PL", new BigDecimal("2.00"),
+                LocalDateTime.now().plusDays(1), null, true);
+
+        mockMvc.perform(post("/api/admin/store-promotions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Summer"));
+    }
+
+    // -----------------------------------------------------------------------
+    // PUT /api/admin/store-promotions/{id}
+    // -----------------------------------------------------------------------
+
+    @Test
+    void updateStorePromotion_valid_shouldReturn200() throws Exception {
+        StorePointsPromotion promo = StorePointsPromotion.builder()
+                .name("Updated").country("PL")
+                .pointsPerCurrency(new BigDecimal("3.00"))
+                .startsAt(LocalDateTime.now().plusDays(1))
+                .enabled(true).build();
+        promo.setId(1L);
+
+        when(loyaltyService.updateStorePromotion(eq(1L), any(), isNull())).thenReturn(promo);
+
+        StorePromotionCreateRequest req = new StorePromotionCreateRequest(
+                "Updated", "PL", new BigDecimal("3.00"),
+                LocalDateTime.now().plusDays(1), null, true);
+
+        mockMvc.perform(put("/api/admin/store-promotions/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Updated"));
+    }
+
+    // -----------------------------------------------------------------------
+    // PATCH /api/admin/store-promotions/{id}/status
+    // -----------------------------------------------------------------------
+
+    @Test
+    void setStorePromotionStatus_shouldReturn200() throws Exception {
+        StorePointsPromotion promo = StorePointsPromotion.builder()
+                .name("Promo").country("PL")
+                .pointsPerCurrency(BigDecimal.ONE)
+                .startsAt(LocalDateTime.now())
+                .enabled(false).build();
+        promo.setId(1L);
+
+        when(loyaltyService.setStorePromotionEnabled(eq(1L), eq(false), isNull())).thenReturn(promo);
+
+        StorePromotionStatusRequest req = new StorePromotionStatusRequest(false);
+
+        mockMvc.perform(patch("/api/admin/store-promotions/1/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(false));
+    }
+
+    // -----------------------------------------------------------------------
+    // POST /api/admin/tools/import-customers
+    // -----------------------------------------------------------------------
+
+    @Test
+    void importCustomersCsv_shouldReturn200WithCount() throws Exception {
+        when(loyaltyService.importCustomersFromCsv(any(), isNull())).thenReturn(3);
+
+        MockMultipartFile file = new MockMultipartFile("file", "customers.csv", "text/csv",
+                "Jan,Kowalski,jan@pl.com,C001,111,PL".getBytes(StandardCharsets.UTF_8));
+
+        mockMvc.perform(multipart("/api/admin/tools/import-customers").file(file))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.importedCount").value(3));
+    }
+
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+
+    private Customer customer(Long id, String email, String country) {
+        Customer c = Customer.builder()
+                .firstName("Jan").lastName("Kowalski")
+                .email(email).customerNumber("C" + id)
+                .phoneNumber("123456789").country(country)
+                .loyaltyPoints(0).build();
+        c.setId(id);
+        return c;
+    }
+}
