@@ -29,6 +29,15 @@ pipeline {
             }
         }
 
+        stage('Analiza SonarQube') {
+            steps {
+                echo '==== Uruchamiam analizę SonarQube ===='
+                withCredentials([string(credentialsId: 'loyalty-club', variable: 'SONAR_TOKEN')]) {
+                    sh 'mvn sonar:sonar -Dsonar.login=${SONAR_TOKEN}'
+                }
+            }
+        }
+
         stage('Budowanie Fullstack (Maven)') {
             steps {
                 echo '==== Rozpoczynam budowanie z profilem build-frontend ===='

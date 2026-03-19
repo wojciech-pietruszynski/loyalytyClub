@@ -19,6 +19,14 @@
         <frontend.workingDirectory>frontend</frontend.workingDirectory>
         <frontend.installDirectory>target</frontend.installDirectory>
         <frontend.resourcesDirectory>src/main/resources/static</frontend.resourcesDirectory>
+        <!-- SonarQube -->
+        <sonar.projectKey>loyalty-club</sonar.projectKey>
+        <sonar.host.url>http://192.168.100.150:9000</sonar.host.url>
+        <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+        <sonar.exclusions>
+            **/config/**,
+            **/LoyaltyClubApplication.java
+        </sonar.exclusions>
     </properties>
     <dependencies>
         <dependency>
@@ -104,6 +112,11 @@
                         <goals><goal>report</goal></goals>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.sonarsource.scanner.maven</groupId>
+                <artifactId>sonar-maven-plugin</artifactId>
+                <version>4.0.0.4121</version>
             </plugin>
         </plugins>
     </build>
