@@ -13,7 +13,10 @@ import pl.pietruszynski.loyaltyclub.api.admin.dto.CouponTemplateCreateRequest;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.CustomerCouponDto;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.CustomerDto;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.CouponTemplateDto;
+import pl.pietruszynski.loyaltyclub.api.admin.dto.HierarchyPromotionCreateRequest;
+import pl.pietruszynski.loyaltyclub.api.admin.dto.HierarchyPromotionDto;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.PointsRequest;
+import pl.pietruszynski.loyaltyclub.api.admin.dto.PurchaseHistoryDto;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.StorePromotionCreateRequest;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.StorePromotionDto;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.StorePromotionStatusRequest;
@@ -22,6 +25,7 @@ import pl.pietruszynski.loyaltyclub.api.admin.model.CouponTemplate;
 import pl.pietruszynski.loyaltyclub.api.admin.model.Customer;
 import pl.pietruszynski.loyaltyclub.api.admin.model.CustomerCoupon;
 import pl.pietruszynski.loyaltyclub.api.admin.model.Transaction;
+import pl.pietruszynski.loyaltyclub.api.store.model.HierarchyPromotion;
 import pl.pietruszynski.loyaltyclub.api.store.model.StorePointsPromotion;
 import pl.pietruszynski.loyaltyclub.api.admin.service.LoyaltyService;
 import pl.pietruszynski.loyaltyclub.api.admin.service.TechnicalUserService;
@@ -120,6 +124,11 @@ public class LoyaltyController {
                 .toList();
     }
 
+    @GetMapping("/customers/{id}/purchase-history")
+    public PurchaseHistoryDto getCustomerPurchaseHistory(@PathVariable Long id, Authentication authentication) {
+        return loyaltyService.getPurchaseHistory(id, getCountryScope(authentication));
+    }
+
     @GetMapping("/customers/{id}/coupons")
     public List<CustomerCouponDto> getCustomerCoupons(@PathVariable Long id, Authentication authentication) {
         return loyaltyService.getCouponsForCustomer(id, getCountryScope(authentication)).stream()
@@ -156,6 +165,32 @@ public class LoyaltyController {
     @PostMapping("/coupons/issue")
     public CustomerCouponDto issueCoupon(@Valid @RequestBody CouponIssueRequest request, Authentication authentication) {
         return mapToCustomerCouponDto(loyaltyService.issueCoupon(request, getCountryScope(authentication)));
+    }
+
+    @GetMapping("/hierarchy-promotions")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICAL')")
+    public List<HierarchyPromotionDto> getHierarchyPromotions(Authentication authentication) {
+        return loyaltyService.getHierarchyPromotions(getCountryScope(authentication)).stream()
+                .map(this::mapToHierarchyPromotionDto)
+                .toList();
+    }
+
+    @PostMapping("/hierarchy-promotions")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICAL')")
+    public HierarchyPromotionDto createHierarchyPromotion(@Valid @RequestBody HierarchyPromotionCreateRequest request, Authentication authentication) {
+        return mapToHierarchyPromotionDto(loyaltyService.createHierarchyPromotion(request, getCountryScope(authentication)));
+    }
+
+    @PutMapping("/hierarchy-promotions/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICAL')")
+    public HierarchyPromotionDto updateHierarchyPromotion(@PathVariable Long id, @Valid @RequestBody HierarchyPromotionCreateRequest request, Authentication authentication) {
+        return mapToHierarchyPromotionDto(loyaltyService.updateHierarchyPromotion(id, request, getCountryScope(authentication)));
+    }
+
+    @PatchMapping("/hierarchy-promotions/{id}/status")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICAL')")
+    public HierarchyPromotionDto setHierarchyPromotionStatus(@PathVariable Long id, @Valid @RequestBody StorePromotionStatusRequest request, Authentication authentication) {
+        return mapToHierarchyPromotionDto(loyaltyService.setHierarchyPromotionEnabled(id, request.enabled(), getCountryScope(authentication)));
     }
 
     @PostMapping(value = "/tools/import-customers", consumes = "multipart/form-data")
@@ -216,6 +251,22 @@ public class LoyaltyController {
                 .description(transaction.getDescription())
                 .timestamp(transaction.getTimestamp())
                 .availableFrom(transaction.getAvailableFrom())
+                .build();
+    }
+
+    private HierarchyPromotionDto mapToHierarchyPromotionDto(HierarchyPromotion promotion) {
+        return HierarchyPromotionDto.builder()
+                .id(promotion.getId())
+                .name(promotion.getName())
+                .country(promotion.getCountry())
+                .hierarchy(promotion.getHierarchy())
+                .productClass(promotion.getProductClass())
+                .subclass(promotion.getSubclass())
+                .type(promotion.getType())
+                .multiplier(promotion.getMultiplier())
+                .startsAt(promotion.getStartsAt())
+                .endsAt(promotion.getEndsAt())
+                .enabled(promotion.isEnabled())
                 .build();
     }
 

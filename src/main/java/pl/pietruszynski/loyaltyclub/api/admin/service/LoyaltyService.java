@@ -7,6 +7,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.CouponIssueRequest;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.CouponTemplateCreateRequest;
+import pl.pietruszynski.loyaltyclub.api.admin.dto.HierarchyPromotionCreateRequest;
+import pl.pietruszynski.loyaltyclub.api.admin.dto.PurchaseHistoryDto;
+import pl.pietruszynski.loyaltyclub.api.admin.dto.PurchaseHistoryPointDto;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.StorePromotionCreateRequest;
 import pl.pietruszynski.loyaltyclub.api.admin.model.CouponReason;
 import pl.pietruszynski.loyaltyclub.api.admin.model.CouponPrefix;
@@ -22,7 +25,10 @@ import pl.pietruszynski.loyaltyclub.api.admin.repository.CouponPrefixRepository;
 import pl.pietruszynski.loyaltyclub.api.admin.repository.CustomerCouponRepository;
 import pl.pietruszynski.loyaltyclub.api.admin.repository.CustomerRepository;
 import pl.pietruszynski.loyaltyclub.api.admin.repository.TransactionRepository;
+import pl.pietruszynski.loyaltyclub.api.store.model.HierarchyPromotion;
+import pl.pietruszynski.loyaltyclub.api.store.model.HierarchyPromotionType;
 import pl.pietruszynski.loyaltyclub.api.store.model.StorePointsPromotion;
+import pl.pietruszynski.loyaltyclub.api.store.repository.HierarchyPromotionRepository;
 import pl.pietruszynski.loyaltyclub.api.store.repository.StorePointsPromotionRepository;
 import pl.pietruszynski.loyaltyclub.exception.BusinessException;
 import pl.pietruszynski.loyaltyclub.exception.ResourceNotFoundException;
@@ -56,6 +62,7 @@ public class LoyaltyService {
     private final CouponPrefixRepository couponPrefixRepository;
     private final CustomerCouponRepository customerCouponRepository;
     private final StorePointsPromotionRepository storePointsPromotionRepository;
+    private final HierarchyPromotionRepository hierarchyPromotionRepository;
 
     @Value("${app.available-country-codes:PL}")
     private String availableCountryCodesConfig;
@@ -184,6 +191,22 @@ public class LoyaltyService {
         return transactionRepository.findAllByCustomerIdOrderByTimestampAsc(customerId);
     }
 
+    public PurchaseHistoryDto getPurchaseHistory(Long customerId, String countryScope) {
+        List<Transaction> transactions = getTransactionsForCustomer(customerId, countryScope);
+        List<PurchaseHistoryPointDto> points = transactions.stream()
+                .filter(t -> t.getPoints() > 0)
+                .collect(Collectors.groupingBy(
+                        t -> t.getPurchaseTimestamp().toLocalDate().toString(),
+                        java.util.TreeMap::new,
+                        Collectors.summingInt(Transaction::getPoints)
+                ))
+                .entrySet().stream()
+                .map(e -> new PurchaseHistoryPointDto(e.getKey(), e.getValue()))
+                .toList();
+        int maxTotal = points.stream().mapToInt(PurchaseHistoryPointDto::total).max().orElse(0);
+        return new PurchaseHistoryDto(points, maxTotal);
+    }
+
     public List<CouponTemplate> getCouponTemplates() {
         return getCouponTemplates(null);
     }
@@ -258,6 +281,68 @@ public class LoyaltyService {
         ensureInScope(promotion.getCountry(), countryScope);
         promotion.setEnabled(enabled);
         return storePointsPromotionRepository.save(promotion);
+    }
+
+    public List<HierarchyPromotion> getHierarchyPromotions(String countryScope) {
+        if (countryScope == null || countryScope.isBlank()) {
+            return hierarchyPromotionRepository.findAllByOrderByStartsAtDesc();
+        }
+        return hierarchyPromotionRepository.findAllByCountryOrderByStartsAtDesc(normalizeCountryCode(countryScope));
+    }
+
+    @Transactional
+    public HierarchyPromotion createHierarchyPromotion(HierarchyPromotionCreateRequest request, String countryScope) {
+        validateHierarchyPromotionRequest(request);
+        String normalizedCountry = normalizeCountryCode(request.country());
+        ensureInScope(normalizedCountry, countryScope);
+        if (!getAvailableCountryCodesSet().contains(normalizedCountry)) {
+            throw new BusinessException(COUNTRY_NOT_ALLOWED);
+        }
+        return hierarchyPromotionRepository.save(HierarchyPromotion.builder()
+                .name(request.name().trim())
+                .country(normalizedCountry)
+                .hierarchy(normalizeOptional(request.hierarchy()))
+                .productClass(normalizeOptional(request.productClass()))
+                .subclass(normalizeOptional(request.subclass()))
+                .type(request.type())
+                .multiplier(request.multiplier())
+                .startsAt(request.startsAt())
+                .endsAt(request.endsAt())
+                .enabled(request.enabled() == null || request.enabled())
+                .build());
+    }
+
+    @Transactional
+    public HierarchyPromotion updateHierarchyPromotion(Long id, HierarchyPromotionCreateRequest request, String countryScope) {
+        validateHierarchyPromotionRequest(request);
+        HierarchyPromotion promotion = hierarchyPromotionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Hierarchy promotion not found with id: " + id));
+        ensureInScope(promotion.getCountry(), countryScope);
+        String normalizedCountry = normalizeCountryCode(request.country());
+        ensureInScope(normalizedCountry, countryScope);
+        if (!getAvailableCountryCodesSet().contains(normalizedCountry)) {
+            throw new BusinessException(COUNTRY_NOT_ALLOWED);
+        }
+        promotion.setName(request.name().trim());
+        promotion.setCountry(normalizedCountry);
+        promotion.setHierarchy(normalizeOptional(request.hierarchy()));
+        promotion.setProductClass(normalizeOptional(request.productClass()));
+        promotion.setSubclass(normalizeOptional(request.subclass()));
+        promotion.setType(request.type());
+        promotion.setMultiplier(request.multiplier());
+        promotion.setStartsAt(request.startsAt());
+        promotion.setEndsAt(request.endsAt());
+        promotion.setEnabled(request.enabled() == null || request.enabled());
+        return hierarchyPromotionRepository.save(promotion);
+    }
+
+    @Transactional
+    public HierarchyPromotion setHierarchyPromotionEnabled(Long id, boolean enabled, String countryScope) {
+        HierarchyPromotion promotion = hierarchyPromotionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Hierarchy promotion not found with id: " + id));
+        ensureInScope(promotion.getCountry(), countryScope);
+        promotion.setEnabled(enabled);
+        return hierarchyPromotionRepository.save(promotion);
     }
 
     public CouponTemplate createCouponTemplate(CouponTemplateCreateRequest request) {
@@ -463,6 +548,27 @@ public class LoyaltyService {
         if (request.customerId() == null || request.couponTemplateId() == null || request.reason() == null) {
             throw new BusinessException("All coupon fields are required");
         }
+    }
+
+    private void validateHierarchyPromotionRequest(HierarchyPromotionCreateRequest request) {
+        if (isBlank(request.name()) || isBlank(request.country()) || request.type() == null || request.startsAt() == null) {
+            throw new BusinessException("Name, country, type and start date are required");
+        }
+        if (request.type() == HierarchyPromotionType.MULTIPLIER) {
+            if (request.multiplier() == null || request.multiplier().signum() <= 0) {
+                throw new BusinessException("Multiplier must be greater than zero for MULTIPLIER type");
+            }
+        }
+        if (request.endsAt() != null && request.endsAt().isBefore(request.startsAt())) {
+            throw new BusinessException("Promotion end date must be after start date");
+        }
+    }
+
+    private String normalizeOptional(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim().toUpperCase(Locale.ROOT);
     }
 
     private void validateStorePromotionRequest(StorePromotionCreateRequest request) {

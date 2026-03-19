@@ -12,6 +12,8 @@ import pl.pietruszynski.loyaltyclub.api.admin.model.TransactionType;
 import pl.pietruszynski.loyaltyclub.api.admin.repository.CustomerRepository;
 import pl.pietruszynski.loyaltyclub.api.admin.repository.TransactionRepository;
 import pl.pietruszynski.loyaltyclub.api.store.dto.*;
+import pl.pietruszynski.loyaltyclub.api.store.model.HierarchyPromotion;
+import pl.pietruszynski.loyaltyclub.api.store.model.HierarchyPromotionType;
 import pl.pietruszynski.loyaltyclub.exception.ResourceNotFoundException;
 
 import java.math.BigDecimal;
@@ -30,6 +32,7 @@ class StoreTransactionServiceTest {
     @Mock private CustomerRepository customerRepository;
     @Mock private TransactionRepository transactionRepository;
     @Mock private StorePromotionService storePromotionService;
+    @Mock private HierarchyPromotionService hierarchyPromotionService;
 
     @InjectMocks
     private StoreTransactionService storeTransactionService;
@@ -46,6 +49,9 @@ class StoreTransactionServiceTest {
         when(customerRepository.findByCustomerNumber("C001")).thenReturn(Optional.of(customer));
         when(transactionRepository.existsBySourceTransactionNumber("TXN-001")).thenReturn(false);
         when(storePromotionService.resolvePointsPerCurrency(eq("PL"), any())).thenReturn(new BigDecimal("1.00"));
+        when(hierarchyPromotionService.getActivePromotions(eq("PL"), any())).thenReturn(Collections.emptyList());
+        when(hierarchyPromotionService.isItemExcluded(any(), any())).thenReturn(false);
+        when(hierarchyPromotionService.resolveItemMultiplier(any(), any())).thenReturn(BigDecimal.ONE);
         when(transactionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0), 1L));
         when(transactionRepository.findAllByCustomerIdOrderByPurchaseTimestampAsc(any())).thenReturn(Collections.emptyList());
         when(customerRepository.save(any())).thenReturn(customer);
@@ -84,7 +90,7 @@ class StoreTransactionServiceTest {
         Customer customer = customer("C001", 0);
         // totalAmount differs from item sum
         List<StoreTransactionItemRequest> items = List.of(
-                new StoreTransactionItemRequest("1", "EAN1", "Item1", "Cat1",
+                new StoreTransactionItemRequest("1", "EAN1", "Item1", new HierarchyRequest("42", null, null),
                         new StoreItemPriceRequest(new BigDecimal("30.00"), "PLN"))
         );
         StoreSaleRequest request = new StoreSaleRequest("C001", items, new BigDecimal("100.00"), "TXN-003", null);
@@ -131,6 +137,9 @@ class StoreTransactionServiceTest {
         when(customerRepository.findByCustomerNumber("C001")).thenReturn(Optional.of(customer));
         when(transactionRepository.existsBySourceTransactionNumber("TXN-006")).thenReturn(false);
         when(storePromotionService.resolvePointsPerCurrency(eq("PL"), any())).thenReturn(new BigDecimal("2.50"));
+        when(hierarchyPromotionService.getActivePromotions(eq("PL"), any())).thenReturn(Collections.emptyList());
+        when(hierarchyPromotionService.isItemExcluded(any(), any())).thenReturn(false);
+        when(hierarchyPromotionService.resolveItemMultiplier(any(), any())).thenReturn(BigDecimal.ONE);
         when(transactionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0), 1L));
         when(transactionRepository.findAllByCustomerIdOrderByPurchaseTimestampAsc(any())).thenReturn(Collections.emptyList());
         when(customerRepository.save(any())).thenReturn(customer);
@@ -155,7 +164,7 @@ class StoreTransactionServiceTest {
 
         StoreReturnRequest returnRequest = new StoreReturnRequest(
                 "C001",
-                List.of(new StoreTransactionItemRequest("1", "EAN1", "Item1", "Cat1",
+                List.of(new StoreTransactionItemRequest("1", "EAN1", "Item1", new HierarchyRequest("42", null, null),
                         new StoreItemPriceRequest(new BigDecimal("50.00"), "PLN"))),
                 new BigDecimal("50.00"),
                 "RET-001",
@@ -189,7 +198,7 @@ class StoreTransactionServiceTest {
 
         StoreReturnRequest returnRequest = new StoreReturnRequest(
                 "C001",
-                List.of(new StoreTransactionItemRequest("1", "EAN1", "Item1", "Cat1",
+                List.of(new StoreTransactionItemRequest("1", "EAN1", "Item1", new HierarchyRequest("42", null, null),
                         new StoreItemPriceRequest(new BigDecimal("50.00"), "PLN"))),
                 new BigDecimal("50.00"),
                 "RET-002",
@@ -216,7 +225,7 @@ class StoreTransactionServiceTest {
 
         StoreReturnRequest returnRequest = new StoreReturnRequest(
                 "C001",
-                List.of(new StoreTransactionItemRequest("1", "EAN1", "Item1", "Cat1",
+                List.of(new StoreTransactionItemRequest("1", "EAN1", "Item1", new HierarchyRequest("42", null, null),
                         new StoreItemPriceRequest(new BigDecimal("100.00"), "PLN"))),
                 new BigDecimal("100.00"),
                 "RET-003",
@@ -261,7 +270,7 @@ class StoreTransactionServiceTest {
 
         StoreReturnRequest returnRequest = new StoreReturnRequest(
                 "C001",
-                List.of(new StoreTransactionItemRequest("1", "EAN1", "Item1", "Cat1",
+                List.of(new StoreTransactionItemRequest("1", "EAN1", "Item1", new HierarchyRequest("42", null, null),
                         new StoreItemPriceRequest(new BigDecimal("10.00"), "PLN"))),
                 new BigDecimal("10.00"),
                 "RET-004",
@@ -290,7 +299,7 @@ class StoreTransactionServiceTest {
 
         StoreReturnRequest returnRequest = new StoreReturnRequest(
                 "C001",
-                List.of(new StoreTransactionItemRequest("1", "EAN1", "Item1", "Cat1",
+                List.of(new StoreTransactionItemRequest("1", "EAN1", "Item1", new HierarchyRequest("42", null, null),
                         new StoreItemPriceRequest(new BigDecimal("50.00"), "PLN"))),
                 new BigDecimal("50.00"),
                 "RET-005",
@@ -319,7 +328,7 @@ class StoreTransactionServiceTest {
 
         StoreReturnRequest returnRequest = new StoreReturnRequest(
                 "C001",
-                List.of(new StoreTransactionItemRequest("1", "EAN1", "Item1", "Cat1",
+                List.of(new StoreTransactionItemRequest("1", "EAN1", "Item1", new HierarchyRequest("42", null, null),
                         new StoreItemPriceRequest(new BigDecimal("50.00"), "PLN"))),
                 new BigDecimal("50.00"),
                 "RET-006",
@@ -347,7 +356,7 @@ class StoreTransactionServiceTest {
 
         StoreReturnRequest returnRequest = new StoreReturnRequest(
                 "C001",
-                List.of(new StoreTransactionItemRequest("1", "EAN1", "Item1", "Cat1",
+                List.of(new StoreTransactionItemRequest("1", "EAN1", "Item1", new HierarchyRequest("42", null, null),
                         new StoreItemPriceRequest(new BigDecimal("10.00"), "PLN"))),
                 new BigDecimal("10.00"),
                 "RET-007",
@@ -396,6 +405,9 @@ class StoreTransactionServiceTest {
         when(customerRepository.findByCustomerNumber("C001")).thenReturn(Optional.of(customer));
         when(transactionRepository.existsBySourceTransactionNumber("TXN-MANUAL")).thenReturn(false);
         when(storePromotionService.resolvePointsPerCurrency(eq("PL"), any())).thenReturn(BigDecimal.ONE);
+        when(hierarchyPromotionService.getActivePromotions(eq("PL"), any())).thenReturn(Collections.emptyList());
+        when(hierarchyPromotionService.isItemExcluded(any(), any())).thenReturn(false);
+        when(hierarchyPromotionService.resolveItemMultiplier(any(), any())).thenReturn(BigDecimal.ONE);
         when(transactionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0), 99L));
         when(transactionRepository.findAllByCustomerIdOrderByPurchaseTimestampAsc(any()))
                 .thenReturn(List.of(manualTx));
@@ -484,6 +496,100 @@ class StoreTransactionServiceTest {
     }
 
     // -----------------------------------------------------------------------
+    // Hierarchy promotion calculation
+    // -----------------------------------------------------------------------
+
+    @Test
+    void registerSale_withHierarchyMultiplier_shouldApplyMultiplier() {
+        Customer customer = customer("C001", 0);
+        StoreSaleRequest request = saleRequest("C001", "TXN-H01", new BigDecimal("100.00"));
+
+        when(customerRepository.findByCustomerNumber("C001")).thenReturn(Optional.of(customer));
+        when(transactionRepository.existsBySourceTransactionNumber("TXN-H01")).thenReturn(false);
+        when(storePromotionService.resolvePointsPerCurrency(eq("PL"), any())).thenReturn(new BigDecimal("1.00"));
+        when(hierarchyPromotionService.getActivePromotions(eq("PL"), any())).thenReturn(Collections.emptyList());
+        when(hierarchyPromotionService.isItemExcluded(any(), any())).thenReturn(false);
+        when(hierarchyPromotionService.resolveItemMultiplier(any(), any())).thenReturn(new BigDecimal("4.00"));
+        when(transactionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0), 10L));
+        when(transactionRepository.findAllByCustomerIdOrderByPurchaseTimestampAsc(any())).thenReturn(Collections.emptyList());
+        when(customerRepository.save(any())).thenReturn(customer);
+
+        StoreTransactionResponse response = storeTransactionService.registerSale("PL", request);
+
+        // 100.00 * 1.00 * 4.00 = 400 points
+        assertThat(response.points()).isEqualTo(400);
+    }
+
+    @Test
+    void registerSale_withHierarchyExclusion_shouldYieldZeroPoints() {
+        Customer customer = customer("C001", 0);
+        StoreSaleRequest request = saleRequest("C001", "TXN-H02", new BigDecimal("100.00"));
+
+        when(customerRepository.findByCustomerNumber("C001")).thenReturn(Optional.of(customer));
+        when(transactionRepository.existsBySourceTransactionNumber("TXN-H02")).thenReturn(false);
+        when(storePromotionService.resolvePointsPerCurrency(eq("PL"), any())).thenReturn(new BigDecimal("1.00"));
+        when(hierarchyPromotionService.getActivePromotions(eq("PL"), any())).thenReturn(Collections.emptyList());
+        when(hierarchyPromotionService.isItemExcluded(any(), any())).thenReturn(true);
+        when(transactionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0), 11L));
+        when(transactionRepository.findAllByCustomerIdOrderByPurchaseTimestampAsc(any())).thenReturn(Collections.emptyList());
+        when(customerRepository.save(any())).thenReturn(customer);
+
+        StoreTransactionResponse response = storeTransactionService.registerSale("PL", request);
+
+        assertThat(response.points()).isZero();
+    }
+
+    @Test
+    void registerReturn_saleWithZeroPoints_shouldCreateReturnWithZeroPoints() {
+        Customer customer = customer("C001", 0);
+        customer.setId(1L);
+
+        LocalDateTime purchaseTime = LocalDateTime.now().minusDays(5);
+        Transaction sale = Transaction.builder()
+                .id(10L)
+                .customer(customer)
+                .points(0)
+                .amount(new BigDecimal("100.00"))
+                .pointsPerCurrency(BigDecimal.ONE)
+                .description("Store sale: SALE-ZERO")
+                .country("PL")
+                .type(TransactionType.SALE)
+                .state(TransactionState.AVAILABLE)
+                .purchaseTimestamp(purchaseTime)
+                .availableFrom(purchaseTime.plusDays(30))
+                .expiresAt(purchaseTime.plusDays(365))
+                .sourceTransactionNumber("SALE-ZERO")
+                .build();
+
+        StoreReturnRequest returnRequest = new StoreReturnRequest(
+                "C001",
+                List.of(new StoreTransactionItemRequest("1", "EAN1", "Item1", new HierarchyRequest("42", null, null),
+                        new StoreItemPriceRequest(new BigDecimal("50.00"), "PLN"))),
+                new BigDecimal("50.00"),
+                "RET-ZERO",
+                "SALE-ZERO",
+                null
+        );
+
+        when(customerRepository.findByCustomerNumber("C001")).thenReturn(Optional.of(customer));
+        when(transactionRepository.existsBySourceTransactionNumber("RET-ZERO")).thenReturn(false);
+        when(transactionRepository.findBySourceTransactionNumberAndCustomerId("SALE-ZERO", 1L))
+                .thenReturn(Optional.of(sale));
+        when(transactionRepository.sumAmountBySourceTransactionIdAndType(any(), eq(TransactionType.RETURN)))
+                .thenReturn(BigDecimal.ZERO);
+        when(transactionRepository.sumPointsBySourceTransactionIdAndType(any(), eq(TransactionType.RETURN)))
+                .thenReturn(0);
+        when(transactionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0), 20L));
+        when(transactionRepository.findAllByCustomerIdOrderByPurchaseTimestampAsc(any())).thenReturn(Collections.emptyList());
+        when(customerRepository.save(any())).thenReturn(customer);
+
+        StoreTransactionResponse response = storeTransactionService.registerReturn("PL", returnRequest);
+
+        assertThat(response.type()).isEqualTo(TransactionType.RETURN);
+        assertThat(response.points()).isZero();
+    }
+
+    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 
@@ -501,7 +607,8 @@ class StoreTransactionServiceTest {
 
     private StoreSaleRequest saleRequest(String customerNumber, String txnNumber, BigDecimal total) {
         List<StoreTransactionItemRequest> items = List.of(
-                new StoreTransactionItemRequest("1", "EAN1", "Item1", "Category1",
+                new StoreTransactionItemRequest("1", "EAN1", "Item1",
+                        new HierarchyRequest("42", null, null),
                         new StoreItemPriceRequest(total, "PLN"))
         );
         return new StoreSaleRequest(customerNumber, items, total, txnNumber, null);

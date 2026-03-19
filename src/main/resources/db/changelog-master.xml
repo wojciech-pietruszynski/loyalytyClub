@@ -35,4 +35,8 @@
         <sqlFile path="migrations/008_coupon_redemption_idempotency.sql" relativeToChangelogFile="true"/>
     </changeSet>
 
+    <changeSet id="009-hierarchy-promotions" author="codex">
+        <sqlFile path="migrations/009_hierarchy_promotions.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
 </databaseChangeLog>

@@ -18,6 +18,8 @@ import pl.pietruszynski.loyaltyclub.api.admin.security.JwtService;
 import pl.pietruszynski.loyaltyclub.api.admin.service.LoyaltyService;
 import pl.pietruszynski.loyaltyclub.api.admin.service.TechnicalUserService;
 import pl.pietruszynski.loyaltyclub.api.ecom.security.EcomUserDetailsService;
+import pl.pietruszynski.loyaltyclub.api.store.model.HierarchyPromotion;
+import pl.pietruszynski.loyaltyclub.api.store.model.HierarchyPromotionType;
 import pl.pietruszynski.loyaltyclub.api.store.model.StorePointsPromotion;
 import pl.pietruszynski.loyaltyclub.api.store.security.StoreUserDetailsService;
 
@@ -389,8 +391,96 @@ class LoyaltyControllerTest {
     }
 
     // -----------------------------------------------------------------------
+    // GET /api/admin/hierarchy-promotions
+    // -----------------------------------------------------------------------
+
+    @Test
+    void getHierarchyPromotions_shouldReturnList() throws Exception {
+        HierarchyPromotion promo = hierarchyPromotion(1L, HierarchyPromotionType.MULTIPLIER, new BigDecimal("4.00"));
+        when(loyaltyService.getHierarchyPromotions(null)).thenReturn(List.of(promo));
+
+        mockMvc.perform(get("/api/admin/hierarchy-promotions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].type").value("MULTIPLIER"))
+                .andExpect(jsonPath("$[0].multiplier").value(4.00));
+    }
+
+    // -----------------------------------------------------------------------
+    // POST /api/admin/hierarchy-promotions
+    // -----------------------------------------------------------------------
+
+    @Test
+    void createHierarchyPromotion_valid_shouldReturn200() throws Exception {
+        HierarchyPromotion saved = hierarchyPromotion(1L, HierarchyPromotionType.MULTIPLIER, new BigDecimal("2.00"));
+        when(loyaltyService.createHierarchyPromotion(any(), isNull())).thenReturn(saved);
+
+        HierarchyPromotionCreateRequest req = new HierarchyPromotionCreateRequest(
+                "Summer Bonus", "PL", "42", "SHOES", null,
+                HierarchyPromotionType.MULTIPLIER, new BigDecimal("2.00"),
+                LocalDateTime.now(), null, true
+        );
+
+        mockMvc.perform(post("/api/admin/hierarchy-promotions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.type").value("MULTIPLIER"));
+    }
+
+    // -----------------------------------------------------------------------
+    // PUT /api/admin/hierarchy-promotions/{id}
+    // -----------------------------------------------------------------------
+
+    @Test
+    void updateHierarchyPromotion_valid_shouldReturn200() throws Exception {
+        HierarchyPromotion updated = hierarchyPromotion(1L, HierarchyPromotionType.EXCLUSION, null);
+        when(loyaltyService.updateHierarchyPromotion(eq(1L), any(), isNull())).thenReturn(updated);
+
+        HierarchyPromotionCreateRequest req = new HierarchyPromotionCreateRequest(
+                "Exclusion", "PL", "99", null, null,
+                HierarchyPromotionType.EXCLUSION, null,
+                LocalDateTime.now(), null, true
+        );
+
+        mockMvc.perform(put("/api/admin/hierarchy-promotions/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.type").value("EXCLUSION"));
+    }
+
+    // -----------------------------------------------------------------------
+    // PATCH /api/admin/hierarchy-promotions/{id}/status
+    // -----------------------------------------------------------------------
+
+    @Test
+    void setHierarchyPromotionStatus_shouldReturn200() throws Exception {
+        HierarchyPromotion promo = hierarchyPromotion(1L, HierarchyPromotionType.MULTIPLIER, new BigDecimal("2.00"));
+        promo.setEnabled(false);
+        when(loyaltyService.setHierarchyPromotionEnabled(eq(1L), eq(false), isNull())).thenReturn(promo);
+
+        StorePromotionStatusRequest req = new StorePromotionStatusRequest(false);
+
+        mockMvc.perform(patch("/api/admin/hierarchy-promotions/1/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(false));
+    }
+
+    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
+
+    private HierarchyPromotion hierarchyPromotion(Long id, HierarchyPromotionType type, BigDecimal multiplier) {
+        HierarchyPromotion p = HierarchyPromotion.builder()
+                .name("Test Hierarchy Promo").country("PL")
+                .hierarchy("42").productClass("SHOES").subclass(null)
+                .type(type).multiplier(multiplier)
+                .startsAt(LocalDateTime.now()).enabled(true).build();
+        p.setId(id);
+        return p;
+    }
 
     private Customer customer(Long id, String email, String country) {
         Customer c = Customer.builder()

@@ -57,7 +57,8 @@ class StoreControllerTest {
 
         StoreSaleRequest request = new StoreSaleRequest(
                 "C001",
-                List.of(new StoreTransactionItemRequest("1", "EAN1", "Item1", "Cat",
+                List.of(new StoreTransactionItemRequest("1", "EAN1", "Item1",
+                        new HierarchyRequest("42", null, null),
                         new StoreItemPriceRequest(new BigDecimal("100.00"), "PLN"))),
                 new BigDecimal("100.00"),
                 "TXN-001",
@@ -79,7 +80,8 @@ class StoreControllerTest {
 
         StoreReturnRequest request = new StoreReturnRequest(
                 "C001",
-                List.of(new StoreTransactionItemRequest("1", "EAN1", "Item1", "Cat",
+                List.of(new StoreTransactionItemRequest("1", "EAN1", "Item1",
+                        new HierarchyRequest("42", null, null),
                         new StoreItemPriceRequest(new BigDecimal("50.00"), "PLN"))),
                 new BigDecimal("50.00"),
                 "RET-001",

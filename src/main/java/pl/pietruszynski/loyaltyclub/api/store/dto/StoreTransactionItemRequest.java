@@ -10,8 +10,9 @@ public record StoreTransactionItemRequest(
         String ean,
         @NotBlank(message = "Item name is required")
         String name,
-        @NotBlank(message = "Item category is required")
-        String category,
+        @NotNull(message = "Item hierarchy is required")
+        @Valid
+        HierarchyRequest hierarchy,
         @NotNull(message = "Item price is required")
         @Valid
         StoreItemPriceRequest price

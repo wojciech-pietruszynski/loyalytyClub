@@ -14,6 +14,7 @@ import pl.pietruszynski.loyaltyclub.api.store.dto.StoreReturnRequest;
 import pl.pietruszynski.loyaltyclub.api.store.dto.StoreSaleRequest;
 import pl.pietruszynski.loyaltyclub.api.store.dto.StoreTransactionItemRequest;
 import pl.pietruszynski.loyaltyclub.api.store.dto.StoreTransactionResponse;
+import pl.pietruszynski.loyaltyclub.api.store.model.HierarchyPromotion;
 import pl.pietruszynski.loyaltyclub.exception.ResourceNotFoundException;
 
 import java.math.BigDecimal;
@@ -32,6 +33,7 @@ public class StoreTransactionService {
     private final CustomerRepository customerRepository;
     private final TransactionRepository transactionRepository;
     private final StorePromotionService storePromotionService;
+    private final HierarchyPromotionService hierarchyPromotionService;
 
     @Transactional
     public StoreTransactionResponse registerSale(String countryCode, StoreSaleRequest request) {
@@ -43,7 +45,8 @@ public class StoreTransactionService {
         validateTotalAmountAgainstItems(request.items(), request.totalAmount());
 
         BigDecimal pointsPerCurrency = storePromotionService.resolvePointsPerCurrency(normalizedCountryCode, purchaseTimestamp);
-        int points = calculatePoints(request.totalAmount(), pointsPerCurrency);
+        List<HierarchyPromotion> activeHierarchyPromotions = hierarchyPromotionService.getActivePromotions(normalizedCountryCode, purchaseTimestamp);
+        int points = calculatePointsWithHierarchy(request.items(), pointsPerCurrency, activeHierarchyPromotions);
 
         Transaction transaction = transactionRepository.save(Transaction.builder()
                 .customer(customer)
@@ -97,16 +100,21 @@ public class StoreTransactionService {
             throw new IllegalArgumentException("Return amount exceeds remaining sale amount");
         }
 
-        int pointsToReverse = calculatePoints(request.totalAmount(), saleTransaction.getPointsPerCurrency());
         int alreadyReturnedPoints = Math.abs(transactionRepository.sumPointsBySourceTransactionIdAndType(saleTransaction.getId(), TransactionType.RETURN));
         int maxReversiblePoints = saleTransaction.getPoints() - alreadyReturnedPoints;
-        if (maxReversiblePoints <= 0) {
-            throw new IllegalArgumentException("No points left to reverse for this sale");
-        }
 
-        int safePointsToReverse = Math.min(pointsToReverse, maxReversiblePoints);
-        if (safePointsToReverse <= 0) {
-            throw new IllegalArgumentException("Return amount is too small to reverse any points");
+        int safePointsToReverse;
+        if (saleTransaction.getPoints() == 0) {
+            safePointsToReverse = 0;
+        } else {
+            if (maxReversiblePoints <= 0) {
+                throw new IllegalArgumentException("No points left to reverse for this sale");
+            }
+            int pointsToReverse = calculatePoints(request.totalAmount(), saleTransaction.getPointsPerCurrency());
+            safePointsToReverse = Math.min(pointsToReverse, maxReversiblePoints);
+            if (safePointsToReverse <= 0) {
+                throw new IllegalArgumentException("Return amount is too small to reverse any points");
+            }
         }
 
         Transaction returnTransaction = transactionRepository.save(Transaction.builder()
@@ -246,6 +254,18 @@ public class StoreTransactionService {
             return TransactionState.EXPIRED;
         }
         return TransactionState.AVAILABLE;
+    }
+
+    private int calculatePointsWithHierarchy(List<StoreTransactionItemRequest> items, BigDecimal baseRate, List<HierarchyPromotion> promotions) {
+        BigDecimal totalPoints = BigDecimal.ZERO;
+        for (StoreTransactionItemRequest item : items) {
+            if (hierarchyPromotionService.isItemExcluded(item.hierarchy(), promotions)) {
+                continue;
+            }
+            BigDecimal multiplier = hierarchyPromotionService.resolveItemMultiplier(item.hierarchy(), promotions);
+            totalPoints = totalPoints.add(item.price().amount().multiply(baseRate).multiply(multiplier));
+        }
+        return totalPoints.setScale(0, RoundingMode.DOWN).intValueExact();
     }
 
     private StoreTransactionResponse toResponse(Transaction transaction) {
