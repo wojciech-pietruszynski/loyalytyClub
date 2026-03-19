@@ -6,9 +6,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import pl.pietruszynski.loyaltyclub.api.admin.model.Customer;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface CustomerRepository extends JpaRepository<Customer, Long> {
+    List<Customer> findAllByCountry(String country);
     Optional<Customer> findByEmail(String email);
     Optional<Customer> findByCustomerNumber(String customerNumber);
     boolean existsByEmail(String email);

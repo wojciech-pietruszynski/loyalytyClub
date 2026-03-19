@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.*;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.LoginRequest;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.LoginResponse;
 import pl.pietruszynski.loyaltyclub.api.admin.repository.TechnicalUserRepository;
-import pl.pietruszynski.loyaltyclub.api.admin.security.AdminUserDetailsService;
 import pl.pietruszynski.loyaltyclub.api.admin.security.JwtService;
 
 @RestController
@@ -21,14 +20,11 @@ import pl.pietruszynski.loyaltyclub.api.admin.security.JwtService;
 public class AuthController {
 
     private final AuthenticationManager authenticationManager;
-    private final AdminUserDetailsService adminUserDetailsService;
     private final TechnicalUserRepository technicalUserRepository;
     private final JwtService jwtService;
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        adminUserDetailsService.loadUserByUsername(request.username());
-
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.username(), request.password())
         );

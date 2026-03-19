@@ -14,5 +14,7 @@ public interface CustomerCouponRepository extends JpaRepository<CustomerCoupon, 
     @EntityGraph(attributePaths = {"customer", "couponTemplate"})
     List<CustomerCoupon> findAllByOrderByIssuedAtDesc();
     @EntityGraph(attributePaths = {"customer", "couponTemplate"})
+    List<CustomerCoupon> findAllByCountryOrderByIssuedAtDesc(String country);
+    @EntityGraph(attributePaths = {"customer", "couponTemplate"})
     List<CustomerCoupon> findAllByCustomerIdOrderByIssuedAtDesc(Long customerId);
 }

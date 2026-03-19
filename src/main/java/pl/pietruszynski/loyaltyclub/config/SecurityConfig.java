@@ -56,7 +56,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/store/**").hasRole("STORE")
                         .requestMatchers("/api/ecom/**").hasRole("ECOM")
                         .requestMatchers("/api/coupon/**").hasRole("ECOM")
-                        .anyRequest().permitAll()
+                        .anyRequest().denyAll()
                 )
                 .authenticationProvider(adminAuthenticationProvider())
                 .authenticationProvider(storeAuthenticationProvider())
