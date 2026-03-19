@@ -82,7 +82,7 @@ public class TechnicalUserService {
         TechnicalUser user = technicalUserRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Technical user not found: " + username));
         if (!user.isEnabled()) {
-            throw new RuntimeException("Technical user is disabled");
+            throw new BusinessException("Technical user is disabled");
         }
         return normalizeCountryCode(user.getCountry());
     }
