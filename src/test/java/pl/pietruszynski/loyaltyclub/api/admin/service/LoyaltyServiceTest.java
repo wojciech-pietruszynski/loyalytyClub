@@ -8,6 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.multipart.MultipartFile;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.CouponIssueRequest;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.CouponTemplateCreateRequest;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.StorePromotionCreateRequest;
@@ -17,6 +18,7 @@ import pl.pietruszynski.loyaltyclub.api.store.model.StorePointsPromotion;
 import pl.pietruszynski.loyaltyclub.api.store.repository.StorePointsPromotionRepository;
 import pl.pietruszynski.loyaltyclub.exception.ResourceNotFoundException;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -866,6 +868,17 @@ class LoyaltyServiceTest {
         assertThatThrownBy(() -> loyaltyService.importCustomersFromCsv(null))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("CSV file is empty");
+    }
+
+    @Test
+    void importCustomersFromCsv_ioException_shouldThrow() throws IOException {
+        MultipartFile file = mock(MultipartFile.class);
+        when(file.isEmpty()).thenReturn(false);
+        when(file.getInputStream()).thenThrow(new IOException("disk error"));
+
+        assertThatThrownBy(() -> loyaltyService.importCustomersFromCsv(file))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Cannot read CSV file");
     }
 
     // -----------------------------------------------------------------------

@@ -105,6 +105,23 @@ class AuthControllerTest {
     }
 
     @Test
+    void refresh_authenticated_shouldReturnNewToken() throws Exception {
+        User principal = new User("admin", "enc",
+                List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+        Authentication auth = new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
+
+        when(jwtService.generateToken("admin", "ADMIN")).thenReturn("new-token");
+        when(jwtService.extractExpirationEpochMillis("new-token")).thenReturn(9999999L);
+
+        mockMvc.perform(post("/api/admin/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .principal(auth))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").value("new-token"))
+                .andExpect(jsonPath("$.role").value("ADMIN"));
+    }
+
+    @Test
     void login_badCredentials_shouldReturn401() throws Exception {
         when(authenticationManager.authenticate(any()))
                 .thenThrow(new BadCredentialsException("Bad credentials"));
