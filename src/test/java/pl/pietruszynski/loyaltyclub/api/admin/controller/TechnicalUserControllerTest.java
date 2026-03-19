@@ -22,7 +22,7 @@ import pl.pietruszynski.loyaltyclub.api.store.security.StoreUserDetailsService;
 
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -70,7 +70,7 @@ class TechnicalUserControllerTest {
     void setTechnicalUserStatus_shouldReturn200() throws Exception {
         TechnicalUser user = techUser(1L, "tech", "PL");
         user.setEnabled(false);
-        when(technicalUserService.setTechnicalUserEnabled(eq(1L), eq(false))).thenReturn(user);
+        when(technicalUserService.setTechnicalUserEnabled(1L, false)).thenReturn(user);
 
         TechnicalUserStatusRequest req = new TechnicalUserStatusRequest(false);
 
@@ -84,7 +84,7 @@ class TechnicalUserControllerTest {
     @Test
     void updateTechnicalUserPassword_shouldReturn200() throws Exception {
         TechnicalUser user = techUser(1L, "tech", "PL");
-        when(technicalUserService.updateTechnicalUserPassword(eq(1L), eq("newpass"))).thenReturn(user);
+        when(technicalUserService.updateTechnicalUserPassword(1L, "newpass")).thenReturn(user);
 
         TechnicalUserPasswordRequest req = new TechnicalUserPasswordRequest("newpass");
 

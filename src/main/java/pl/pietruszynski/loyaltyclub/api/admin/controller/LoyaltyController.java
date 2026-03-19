@@ -28,7 +28,6 @@ import pl.pietruszynski.loyaltyclub.api.admin.service.TechnicalUserService;
 
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -43,7 +42,7 @@ public class LoyaltyController {
         String countryScope = getCountryScope(authentication);
         return loyaltyService.getAllCustomers(countryScope).stream()
                 .map(this::mapToCustomerDto)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @GetMapping("/config/countries")
@@ -139,14 +138,14 @@ public class LoyaltyController {
     public List<CustomerCouponDto> getIssuedCoupons(Authentication authentication) {
         return loyaltyService.getIssuedCoupons(getCountryScope(authentication)).stream()
                 .map(this::mapToCustomerCouponDto)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @GetMapping("/coupon-templates")
     public List<CouponTemplateDto> getCouponTemplates(Authentication authentication) {
         return loyaltyService.getCouponTemplates(getCountryScope(authentication)).stream()
                 .map(this::mapToCouponTemplateDto)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @PostMapping("/coupon-templates")

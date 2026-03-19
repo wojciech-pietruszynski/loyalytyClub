@@ -24,6 +24,7 @@ import pl.pietruszynski.loyaltyclub.api.admin.repository.CustomerRepository;
 import pl.pietruszynski.loyaltyclub.api.admin.repository.TransactionRepository;
 import pl.pietruszynski.loyaltyclub.api.store.model.StorePointsPromotion;
 import pl.pietruszynski.loyaltyclub.api.store.repository.StorePointsPromotionRepository;
+import pl.pietruszynski.loyaltyclub.exception.BusinessException;
 import pl.pietruszynski.loyaltyclub.exception.ResourceNotFoundException;
 
 import java.io.BufferedReader;
@@ -44,6 +45,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class LoyaltyService {
+
+    private static final String COUNTRY_NOT_ALLOWED = "Country code is not allowed";
 
     private final CustomerRepository customerRepository;
     private final TransactionRepository transactionRepository;
@@ -89,15 +92,15 @@ public class LoyaltyService {
         ensureInScope(normalizedCountry, countryScope);
 
         if (customerRepository.existsByEmail(customer.getEmail())) {
-            throw new RuntimeException("Customer with this email already exists");
+            throw new BusinessException("Customer with this email already exists");
         }
 
         if (customerRepository.existsByCustomerNumber(customer.getCustomerNumber())) {
-            throw new RuntimeException("Customer with this customer number already exists");
+            throw new BusinessException("Customer with this customer number already exists");
         }
 
         if (!getAvailableCountryCodesSet().contains(normalizedCountry)) {
-            throw new RuntimeException("Country code is not allowed");
+            throw new BusinessException(COUNTRY_NOT_ALLOWED);
         }
 
         if (customer.getLoyaltyPoints() == null) {
@@ -120,13 +123,13 @@ public class LoyaltyService {
         ensureInScope(normalizedCountry, countryScope);
 
         if (!getAvailableCountryCodesSet().contains(normalizedCountry)) {
-            throw new RuntimeException("Country code is not allowed");
+            throw new BusinessException(COUNTRY_NOT_ALLOWED);
         }
         if (customerRepository.existsByEmailAndIdNot(updates.getEmail(), id)) {
-            throw new RuntimeException("Customer with this email already exists");
+            throw new BusinessException("Customer with this email already exists");
         }
         if (customerRepository.existsByCustomerNumberAndIdNot(updates.getCustomerNumber(), id)) {
-            throw new RuntimeException("Customer with this customer number already exists");
+            throw new BusinessException("Customer with this customer number already exists");
         }
 
         customer.setFirstName(updates.getFirstName());
@@ -211,7 +214,7 @@ public class LoyaltyService {
         String normalizedCountry = normalizeCountryCode(request.country());
         ensureInScope(normalizedCountry, countryScope);
         if (!getAvailableCountryCodesSet().contains(normalizedCountry)) {
-            throw new RuntimeException("Country code is not allowed");
+            throw new BusinessException(COUNTRY_NOT_ALLOWED);
         }
 
         return storePointsPromotionRepository.save(StorePointsPromotion.builder()
@@ -234,7 +237,7 @@ public class LoyaltyService {
         String normalizedCountry = normalizeCountryCode(request.country());
         ensureInScope(normalizedCountry, countryScope);
         if (!getAvailableCountryCodesSet().contains(normalizedCountry)) {
-            throw new RuntimeException("Country code is not allowed");
+            throw new BusinessException(COUNTRY_NOT_ALLOWED);
         }
 
         promotion.setName(request.name().trim());
@@ -268,10 +271,10 @@ public class LoyaltyService {
         ensureInScope(normalizedCountry, countryScope);
 
         if (!getAvailableCountryCodesSet().contains(normalizedCountry)) {
-            throw new RuntimeException("Country code is not allowed");
+            throw new BusinessException(COUNTRY_NOT_ALLOWED);
         }
         if (!couponPrefixRepository.existsByValue(normalizedPrefix)) {
-            throw new RuntimeException("Coupon prefix is not allowed");
+            throw new BusinessException("Coupon prefix is not allowed");
         }
 
         boolean exists = couponTemplateRepository.existsByCouponValueAndMinimumPurchaseValueAndRequiredPointsAndCountryAndValidityDaysAndCouponPrefix(
@@ -283,7 +286,7 @@ public class LoyaltyService {
                 normalizedPrefix
         );
         if (exists) {
-            throw new RuntimeException("Coupon template already exists");
+            throw new BusinessException("Coupon template already exists");
         }
 
         return couponTemplateRepository.save(CouponTemplate.builder()
@@ -313,12 +316,12 @@ public class LoyaltyService {
         ensureInScope(normalizedCountry, countryScope);
 
         if (!customer.getCountry().equals(normalizedCountry)) {
-            throw new RuntimeException("Customer country does not match coupon country");
+            throw new BusinessException("Customer country does not match coupon country");
         }
 
         if (reason == CouponReason.POINTS_EXCHANGE) {
             if (customer.getLoyaltyPoints() < template.getRequiredPoints()) {
-                throw new RuntimeException("Not enough points to issue this coupon");
+                throw new BusinessException("Not enough points to issue this coupon");
             }
 
             customer.setLoyaltyPoints(customer.getLoyaltyPoints() - template.getRequiredPoints());
@@ -360,7 +363,7 @@ public class LoyaltyService {
     @Transactional
     public int importCustomersFromCsv(MultipartFile file, String countryScope) {
         if (file == null || file.isEmpty()) {
-            throw new RuntimeException("CSV file is empty");
+            throw new BusinessException("CSV file is empty");
         }
 
         int imported = 0;
@@ -371,47 +374,45 @@ public class LoyaltyService {
             String line;
             while ((line = reader.readLine()) != null) {
                 lineNumber++;
-                if (line.trim().isEmpty()) {
-                    continue;
-                }
-
-                if (delimiter == null) {
-                    delimiter = detectDelimiter(line);
-                }
-
-                List<String> values = splitCsvLine(line, delimiter);
-                if (imported == 0 && isHeaderRow(values)) {
-                    continue;
-                }
-
-                if (values.size() != 6) {
-                    throw new RuntimeException("Invalid CSV format at line " + lineNumber + ". Expected 6 columns.");
-                }
-
-                try {
-                    Customer customer = Customer.builder()
-                            .firstName(values.get(0).trim())
-                            .lastName(values.get(1).trim())
-                            .email(values.get(2).trim())
-                            .customerNumber(values.get(3).trim())
-                            .phoneNumber(values.get(4).trim())
-                            .country(values.get(5).trim())
-                            .build();
-                    createCustomer(customer, countryScope);
-                    imported++;
-                } catch (RuntimeException ex) {
-                    throw new RuntimeException("CSV import error at line " + lineNumber + ": " + ex.getMessage());
+                if (!line.trim().isEmpty()) {
+                    if (delimiter == null) {
+                        delimiter = detectDelimiter(line);
+                    }
+                    List<String> values = splitCsvLine(line, delimiter);
+                    if (imported > 0 || !isHeaderRow(values)) {
+                        importCustomerLine(values, lineNumber, countryScope);
+                        imported++;
+                    }
                 }
             }
         } catch (IOException e) {
-            throw new RuntimeException("Cannot read CSV file", e);
+            throw new BusinessException("Cannot read CSV file", e);
         }
 
         if (imported == 0) {
-            throw new RuntimeException("No customers imported from CSV");
+            throw new BusinessException("No customers imported from CSV");
         }
 
         return imported;
+    }
+
+    private void importCustomerLine(List<String> values, int lineNumber, String countryScope) {
+        if (values.size() != 6) {
+            throw new BusinessException("Invalid CSV format at line " + lineNumber + ". Expected 6 columns.");
+        }
+        Customer customer = Customer.builder()
+                .firstName(values.get(0).trim())
+                .lastName(values.get(1).trim())
+                .email(values.get(2).trim())
+                .customerNumber(values.get(3).trim())
+                .phoneNumber(values.get(4).trim())
+                .country(values.get(5).trim())
+                .build();
+        try {
+            createCustomer(customer, countryScope);
+        } catch (RuntimeException ex) {
+            throw new BusinessException("CSV import error at line " + lineNumber + ": " + ex.getMessage());
+        }
     }
 
     @Transactional
@@ -441,7 +442,7 @@ public class LoyaltyService {
                 || isBlank(customer.getCustomerNumber())
                 || isBlank(customer.getPhoneNumber())
                 || isBlank(customer.getCountry())) {
-            throw new RuntimeException("All customer fields are required");
+            throw new BusinessException("All customer fields are required");
         }
     }
 
@@ -452,13 +453,13 @@ public class LoyaltyService {
                 || isBlank(customer.getCustomerNumber())
                 || isBlank(customer.getPhoneNumber())
                 || isBlank(customer.getCountry())) {
-            throw new RuntimeException("All customer fields are required");
+            throw new BusinessException("All customer fields are required");
         }
     }
 
     private void validateCouponIssueRequest(CouponIssueRequest request) {
         if (request.customerId() == null || request.couponTemplateId() == null || request.reason() == null) {
-            throw new RuntimeException("All coupon fields are required");
+            throw new BusinessException("All coupon fields are required");
         }
     }
 
@@ -467,13 +468,13 @@ public class LoyaltyService {
                 || isBlank(request.country())
                 || request.pointsPerCurrency() == null
                 || request.startsAt() == null) {
-            throw new RuntimeException("All store promotion fields are required");
+            throw new BusinessException("All store promotion fields are required");
         }
         if (request.pointsPerCurrency().signum() <= 0) {
-            throw new RuntimeException("Points per currency must be greater than zero");
+            throw new BusinessException("Points per currency must be greater than zero");
         }
         if (request.endsAt() != null && request.endsAt().isBefore(request.startsAt())) {
-            throw new RuntimeException("Promotion end date must be after start date");
+            throw new BusinessException("Promotion end date must be after start date");
         }
     }
 
@@ -484,14 +485,14 @@ public class LoyaltyService {
                 || request.validityDays() == null
                 || isBlank(request.country())
                 || isBlank(request.couponPrefix())) {
-            throw new RuntimeException("All coupon template fields are required");
+            throw new BusinessException("All coupon template fields are required");
         }
 
         if (request.couponValue().signum() <= 0
                 || request.minimumPurchaseValue().signum() < 0
                 || request.requiredPoints() <= 0
                 || request.validityDays() <= 0) {
-            throw new RuntimeException("Coupon template values must be greater than zero");
+            throw new BusinessException("Coupon template values must be greater than zero");
         }
     }
 
@@ -518,7 +519,7 @@ public class LoyaltyService {
 
     private void ensureInScope(String country, String countryScope) {
         if (!isInScope(country, countryScope)) {
-            throw new RuntimeException("Access denied for this country");
+            throw new BusinessException("Access denied for this country");
         }
     }
 
@@ -559,14 +560,12 @@ public class LoyaltyService {
             char ch = line.charAt(i);
             if (ch == '"') {
                 inQuotes = !inQuotes;
-                continue;
-            }
-            if (ch == delimiter && !inQuotes) {
+            } else if (ch == delimiter && !inQuotes) {
                 values.add(current.toString());
                 current.setLength(0);
-                continue;
+            } else {
+                current.append(ch);
             }
-            current.append(ch);
         }
         values.add(current.toString());
         return values;
@@ -580,7 +579,7 @@ public class LoyaltyService {
                 return code;
             }
         }
-        throw new RuntimeException("Cannot generate unique coupon code");
+        throw new BusinessException("Cannot generate unique coupon code");
     }
 
     private String generateElevenDigits() {

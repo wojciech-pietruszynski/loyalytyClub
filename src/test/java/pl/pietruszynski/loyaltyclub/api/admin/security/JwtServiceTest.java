@@ -62,8 +62,8 @@ class JwtServiceTest {
         String token = jwtService.generateToken("admin");
         long expiry = jwtService.extractExpirationEpochMillis(token);
 
-        assertThat(expiry).isGreaterThan(before);
-        assertThat(expiry).isLessThanOrEqualTo(before + EXPIRATION_MS + 1000);
+        assertThat(expiry).isGreaterThan(before)
+                .isLessThanOrEqualTo(before + EXPIRATION_MS + 1000);
     }
 
     @Test
@@ -83,10 +83,9 @@ class JwtServiceTest {
     }
 
     @Test
-    void isTokenValid_withExpiredToken_shouldThrowExpiredJwtException() throws InterruptedException {
-        ReflectionTestUtils.setField(jwtService, "jwtExpirationMs", 1L);
+    void isTokenValid_withExpiredToken_shouldThrowExpiredJwtException() {
+        ReflectionTestUtils.setField(jwtService, "jwtExpirationMs", -1L);
         String token = jwtService.generateToken("admin");
-        Thread.sleep(50);
         UserDetails userDetails = User.withUsername("admin").password("pass").authorities(Collections.emptyList()).build();
 
         // JJWT throws ExpiredJwtException when parsing an expired token

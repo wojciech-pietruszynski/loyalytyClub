@@ -107,8 +107,8 @@ class GlobalExceptionHandlerTest {
 
         @SuppressWarnings("unchecked")
         var errors = (java.util.Map<String, String>) response.getBody().getProperties().get("errors");
-        assertThat(errors).hasSize(2);
-        assertThat(errors).containsKey("email");
-        assertThat(errors).containsKey("firstName");
+        assertThat(errors).hasSize(2)
+                .containsKey("email")
+                .containsKey("firstName");
     }
 }

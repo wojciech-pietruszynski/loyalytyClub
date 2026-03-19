@@ -436,7 +436,7 @@ class StoreTransactionServiceTest {
         StorePointsBalanceResponse balance = storeTransactionService.getPointsBalance("C001");
 
         assertThat(balance.expiredPoints()).isEqualTo(30);
-        assertThat(balance.availablePoints()).isEqualTo(0);
+        assertThat(balance.availablePoints()).isZero();
     }
 
     // -----------------------------------------------------------------------
@@ -471,8 +471,8 @@ class StoreTransactionServiceTest {
         StorePointsBalanceResponse balance = storeTransactionService.getPointsBalance("C001");
 
         assertThat(balance.availablePoints()).isEqualTo(100);
-        assertThat(balance.pendingPoints()).isEqualTo(0);
-        assertThat(balance.expiredPoints()).isEqualTo(0);
+        assertThat(balance.pendingPoints()).isZero();
+        assertThat(balance.expiredPoints()).isZero();
     }
 
     @Test

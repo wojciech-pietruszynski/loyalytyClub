@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.TechnicalUserCreateRequest;
 import pl.pietruszynski.loyaltyclub.api.admin.model.TechnicalUser;
 import pl.pietruszynski.loyaltyclub.api.admin.repository.TechnicalUserRepository;
+import pl.pietruszynski.loyaltyclub.exception.BusinessException;
 import pl.pietruszynski.loyaltyclub.exception.ResourceNotFoundException;
 
 import java.util.Arrays;
@@ -37,14 +38,14 @@ public class TechnicalUserService {
     @Transactional
     public TechnicalUser createTechnicalUser(TechnicalUserCreateRequest request) {
         if (isBlank(request.username()) || isBlank(request.password()) || isBlank(request.country())) {
-            throw new RuntimeException("All technical user fields are required");
+            throw new BusinessException("All technical user fields are required");
         }
         String normalizedCountry = normalizeCountryCode(request.country());
         if (!getAvailableCountryCodesSet().contains(normalizedCountry)) {
-            throw new RuntimeException("Country code is not allowed");
+            throw new BusinessException("Country code is not allowed");
         }
         if (technicalUserRepository.existsByUsername(request.username().trim())) {
-            throw new RuntimeException("Technical user with this username already exists");
+            throw new BusinessException("Technical user with this username already exists");
         }
 
         TechnicalUser user = TechnicalUser.builder()
@@ -68,7 +69,7 @@ public class TechnicalUserService {
     @Transactional
     public TechnicalUser updateTechnicalUserPassword(Long id, String password) {
         if (isBlank(password)) {
-            throw new RuntimeException("Password is required");
+            throw new BusinessException("Password is required");
         }
         TechnicalUser user = technicalUserRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Technical user not found with id: " + id));
