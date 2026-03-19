@@ -60,9 +60,10 @@ public class LoyaltyService {
     }
 
     public List<Customer> getAllCustomers(String countryScope) {
-        return customerRepository.findAll().stream()
-                .filter(customer -> isInScope(customer.getCountry(), countryScope))
-                .toList();
+        if (countryScope != null && !countryScope.isBlank()) {
+            return customerRepository.findAllByCountry(normalizeCountryCode(countryScope));
+        }
+        return customerRepository.findAll();
     }
 
     public Customer getCustomerById(Long id) {
@@ -154,9 +155,10 @@ public class LoyaltyService {
     }
 
     public List<CustomerCoupon> getIssuedCoupons(String countryScope) {
-        return customerCouponRepository.findAllByOrderByIssuedAtDesc().stream()
-                .filter(coupon -> isInScope(coupon.getCouponTemplate().getCountry(), countryScope))
-                .toList();
+        if (countryScope != null && !countryScope.isBlank()) {
+            return customerCouponRepository.findAllByCountryOrderByIssuedAtDesc(normalizeCountryCode(countryScope));
+        }
+        return customerCouponRepository.findAllByOrderByIssuedAtDesc();
     }
 
     public List<CustomerCoupon> getCouponsForCustomer(Long customerId) {
@@ -182,9 +184,10 @@ public class LoyaltyService {
     }
 
     public List<CouponTemplate> getCouponTemplates(String countryScope) {
-        return couponTemplateRepository.findAll().stream()
-                .filter(template -> isInScope(template.getCountry(), countryScope))
-                .toList();
+        if (countryScope != null && !countryScope.isBlank()) {
+            return couponTemplateRepository.findAllByCountry(normalizeCountryCode(countryScope));
+        }
+        return couponTemplateRepository.findAll();
     }
 
     public List<String> getCouponPrefixes() {
@@ -327,18 +330,6 @@ public class LoyaltyService {
                     .amount(BigDecimal.ZERO)
                     .pointsPerCurrency(BigDecimal.ONE)
                     .description("Issued coupon (points exchange): " + template.getCouponPrefix())
-                    .country(customer.getCountry())
-                    .type(TransactionType.MANUAL_ADJUSTMENT)
-                    .state(TransactionState.AVAILABLE)
-                    .build();
-            transactionRepository.save(transaction);
-        } else {
-            Transaction transaction = Transaction.builder()
-                    .customer(customer)
-                    .points(0)
-                    .amount(BigDecimal.ZERO)
-                    .pointsPerCurrency(BigDecimal.ONE)
-                    .description("Issued coupon (complaint): " + template.getCouponPrefix())
                     .country(customer.getCountry())
                     .type(TransactionType.MANUAL_ADJUSTMENT)
                     .state(TransactionState.AVAILABLE)
