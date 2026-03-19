@@ -17,6 +17,18 @@ pipeline {
             }
         }
 
+        stage('Testy jednostkowe (Backend)') {
+            steps {
+                echo '==== Uruchamiam testy jednostkowe backendu ===='
+                sh 'mvn test -P build-backend'
+            }
+            post {
+                always {
+                    junit 'target/surefire-reports/*.xml'
+                }
+            }
+        }
+
         stage('Budowanie Fullstack (Maven)') {
             steps {
                 echo '==== Rozpoczynam budowanie z profilem build-frontend ===='
