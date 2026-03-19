@@ -26,13 +26,13 @@ import pl.pietruszynski.loyaltyclub.api.store.model.StorePointsPromotion;
 import pl.pietruszynski.loyaltyclub.api.store.repository.StorePointsPromotionRepository;
 import pl.pietruszynski.loyaltyclub.exception.BusinessException;
 import pl.pietruszynski.loyaltyclub.exception.ResourceNotFoundException;
+import pl.pietruszynski.loyaltyclub.util.CouponCodeGenerator;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
@@ -48,7 +48,7 @@ public class LoyaltyService {
 
     private static final String COUNTRY_NOT_ALLOWED = "Country code is not allowed";
 
-    private final SecureRandom secureRandom = new SecureRandom();
+    private final CouponCodeGenerator couponCodeGenerator;
 
     private final CustomerRepository customerRepository;
     private final TransactionRepository transactionRepository;
@@ -585,11 +585,7 @@ public class LoyaltyService {
     }
 
     private String generateElevenDigits() {
-        StringBuilder digits = new StringBuilder(11);
-        for (int i = 0; i < 11; i++) {
-            digits.append(secureRandom.nextInt(10));
-        }
-        return digits.toString();
+        return couponCodeGenerator.generateElevenDigits();
     }
 
 }

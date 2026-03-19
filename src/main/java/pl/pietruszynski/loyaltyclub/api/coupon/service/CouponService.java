@@ -25,9 +25,9 @@ import pl.pietruszynski.loyaltyclub.api.coupon.model.CouponRedemptionRequest;
 import pl.pietruszynski.loyaltyclub.api.coupon.model.CouponValidationStatus;
 import pl.pietruszynski.loyaltyclub.api.coupon.repository.CouponRedemptionRequestRepository;
 import pl.pietruszynski.loyaltyclub.exception.ResourceNotFoundException;
+import pl.pietruszynski.loyaltyclub.util.CouponCodeGenerator;
 
 import java.math.BigDecimal;
-import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Locale;
 
@@ -36,7 +36,7 @@ import java.util.Locale;
 @Transactional(readOnly = true)
 public class CouponService {
 
-    private final SecureRandom secureRandom = new SecureRandom();
+    private final CouponCodeGenerator couponCodeGenerator;
 
     private final CustomerRepository customerRepository;
     private final CouponTemplateRepository couponTemplateRepository;
@@ -211,11 +211,7 @@ public class CouponService {
     }
 
     private String generateElevenDigits() {
-        StringBuilder digits = new StringBuilder(11);
-        for (int i = 0; i < 11; i++) {
-            digits.append(secureRandom.nextInt(10));
-        }
-        return digits.toString();
+        return couponCodeGenerator.generateElevenDigits();
     }
 
     private CustomerCoupon createCouponWithRetry(Customer customer, CouponTemplate couponTemplate, LocalDateTime issuedAt) {

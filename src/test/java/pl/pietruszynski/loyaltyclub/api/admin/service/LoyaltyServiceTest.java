@@ -16,7 +16,9 @@ import pl.pietruszynski.loyaltyclub.api.admin.model.*;
 import pl.pietruszynski.loyaltyclub.api.admin.repository.*;
 import pl.pietruszynski.loyaltyclub.api.store.model.StorePointsPromotion;
 import pl.pietruszynski.loyaltyclub.api.store.repository.StorePointsPromotionRepository;
+import pl.pietruszynski.loyaltyclub.exception.BusinessException;
 import pl.pietruszynski.loyaltyclub.exception.ResourceNotFoundException;
+import pl.pietruszynski.loyaltyclub.util.CouponCodeGenerator;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -32,6 +34,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class LoyaltyServiceTest {
 
+    @Mock private CouponCodeGenerator couponCodeGenerator;
     @Mock private CustomerRepository customerRepository;
     @Mock private TransactionRepository transactionRepository;
     @Mock private CouponTemplateRepository couponTemplateRepository;
@@ -877,7 +880,7 @@ class LoyaltyServiceTest {
         when(file.getInputStream()).thenThrow(new IOException("disk error"));
 
         assertThatThrownBy(() -> loyaltyService.importCustomersFromCsv(file))
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Cannot read CSV file");
     }
 

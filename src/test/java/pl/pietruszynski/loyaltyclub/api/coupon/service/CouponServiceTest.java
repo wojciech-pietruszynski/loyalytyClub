@@ -17,6 +17,7 @@ import pl.pietruszynski.loyaltyclub.api.coupon.model.CouponRedemptionRequest;
 import pl.pietruszynski.loyaltyclub.api.coupon.model.CouponValidationStatus;
 import pl.pietruszynski.loyaltyclub.api.coupon.repository.CouponRedemptionRequestRepository;
 import pl.pietruszynski.loyaltyclub.exception.ResourceNotFoundException;
+import pl.pietruszynski.loyaltyclub.util.CouponCodeGenerator;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import java.math.BigDecimal;
@@ -30,6 +31,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class CouponServiceTest {
 
+    @Mock private CouponCodeGenerator couponCodeGenerator;
     @Mock private CustomerRepository customerRepository;
     @Mock private CouponTemplateRepository couponTemplateRepository;
     @Mock private CustomerCouponRepository customerCouponRepository;
