@@ -17,67 +17,58 @@ pipeline {
 
         stage('Budowanie Fullstack (Maven)') {
             steps {
-                echo '==== Rozpoczynam budowanie z profilem build-frontend ===='
+                echo '==== Rozpoczynam budowanie ===='
                 sh 'mvn clean package -P build-frontend -DskipTests'
             }
         }
 
         stage('Zatrzymanie i Archiwizacja') {
             steps {
-                echo '==== Zatrzymywanie starej wersji i archiwizacja ===='
-                // Używamy bloku z trzema pojedynczymi apostrofami ('''),
-                // aby Jenkins przekazał te zmienne do basha bez ewaluacji w Groovy.
-                sh '''
-                    # 1. Zatrzymanie poprzedniego procesu (jeśli istnieje)
-                    echo "Szukam i zatrzymuję proces loyaltyClub.jar..."
-                    pkill -f "loyaltyClub.jar" || echo "Brak uruchomionego procesu, idę dalej."
+                echo '==== Zatrzymywanie starej wersji ===='
+                // Używamy " " zamiane na ' ' aby zmienne ${TARGET_DIR} działały
+                sh """
+                    # Zabijamy stare procesy - dodajemy || true, żeby nie wywaliło builda jeśli nic nie znajdzie
+                    pgrep -f "loyaltyClub.jar" && pkill -9 -f "loyaltyClub.jar" || echo "Proces nie działał."
 
-                    # Opcjonalnie: dajemy systemowi sekundę na zwolnienie zasobów (np. portu)
-                    sleep 2
+                    sleep 3
 
-                    # 2. Tworzenie folderu archiwum (jeśli nie istnieje)
                     mkdir -p ${ARCHIVE_DIR}
-
-                    # 3. Archiwizacja pliku JAR z datą i godziną
                     if [ -f "${TARGET_DIR}/loyaltyClub.jar" ]; then
-                        TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-                        mv ${TARGET_DIR}/loyaltyClub.jar ${ARCHIVE_DIR}/loyaltyClub_${TIMESTAMP}.jar
-                        echo "Stary plik JAR zarchiwizowany jako loyaltyClub_${TIMESTAMP}.jar"
-                    else
-                        echo "Brak poprzedniego pliku JAR do zarchiwizowania."
+                        TIMESTAMP=\$(date +"%Y%m%d_%H%M%S")
+                        mv "${TARGET_DIR}/loyaltyClub.jar" "${ARCHIVE_DIR}/loyaltyClub_\${TIMESTAMP}.jar"
                     fi
-                '''
+                """
             }
         }
 
         stage('Kopiowanie (Deploy)') {
             steps {
-                echo '==== Kopiowanie gotowego pliku .jar ===='
-                sh 'cp target/*.jar ${TARGET_DIR}/loyaltyClub.jar'
+                sh "cp target/*.jar ${TARGET_DIR}/loyaltyClub.jar"
             }
         }
 
         stage('Uruchomienie Aplikacji') {
             steps {
-                echo '==== Uruchamianie nowej wersji w tle ===='
-                sh '''
-                    # JENKINS_NODE_COOKIE=dontKillMe jest kluczowe!
-                    # Zapobiega to domyślnemu zachowaniu Jenkinsa, który ubija
-                    # wszystkie procesy potomne po zakończeniu zadania.
+                echo '==== Uruchamianie nowej wersji ===='
+                // Używamy JENKINS_NODE_COOKIE, aby Jenkins nie zabił procesu po zakończeniu joba
+                sh """
+                    export JENKINS_NODE_COOKIE=dontKillMe
+                    nohup java -jar ${TARGET_DIR}/loyaltyClub.jar > ${TARGET_DIR}/application.log 2>&1 &
 
-                    JENKINS_NODE_COOKIE=dontKillMe nohup java -jar ${TARGET_DIR}/loyaltyClub.jar > ${TARGET_DIR}/application.log 2>&1 &
-                    echo "Aplikacja wystartowała. Logi są zapisywane do ${TARGET_DIR}/application.log"
-                '''
+                    # Opcjonalnie: sprawdźmy czy proces w ogóle ruszył
+                    sleep 5
+                    pgrep -f "loyaltyClub.jar" || (echo "BŁĄD: Aplikacja nie wystartowała!" && exit 1)
+                """
             }
         }
     }
 
     post {
         success {
-            echo "==== SUKCES: Nowa wersja aplikacji została wdrożona i uruchomiona w ${TARGET_DIR} ===="
+            echo "==== Wdrożono pomyślnie ===="
         }
         failure {
-            echo "==== BŁĄD: Coś poszło nie tak podczas budowania. Sprawdź logi. ===="
+            echo "==== BŁĄD builda ===="
         }
     }
 }
