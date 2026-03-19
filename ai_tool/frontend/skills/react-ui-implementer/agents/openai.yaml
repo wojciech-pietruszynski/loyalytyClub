@@ -1,4 +1,0 @@
-interface:
-  display_name: "React UI Implementer"
-  short_description: "Implement React UI per plan"
-  default_prompt: "Use $react-ui-implementer to implement React UI changes from PLAN.md."

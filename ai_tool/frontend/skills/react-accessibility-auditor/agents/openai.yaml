@@ -1,4 +1,0 @@
-interface:
-  display_name: "React Accessibility Auditor"
-  short_description: "Audit React UI for accessibility"
-  default_prompt: "Use $react-accessibility-auditor to audit React UI for a11y issues."
