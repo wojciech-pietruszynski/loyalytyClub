@@ -39,4 +39,8 @@
         <sqlFile path="migrations/009_hierarchy_promotions.sql" relativeToChangelogFile="true"/>
     </changeSet>
 
+    <changeSet id="010-audit-tiers-referrals" author="codex">
+        <sqlFile path="migrations/010_audit_tiers_referrals.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
 </databaseChangeLog>

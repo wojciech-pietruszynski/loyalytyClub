@@ -42,6 +42,13 @@ public class Customer {
     @Builder.Default
     private Integer loyaltyPoints = 0;
 
+    @Column(length = 64)
+    private String referralCode;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "referred_by_customer_id")
+    private Customer referredBy;
+
     @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<Transaction> transactions = new ArrayList<>();

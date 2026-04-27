@@ -18,7 +18,9 @@ import pl.pietruszynski.loyaltyclub.api.store.model.StorePointsPromotion;
 import pl.pietruszynski.loyaltyclub.api.store.repository.StorePointsPromotionRepository;
 import pl.pietruszynski.loyaltyclub.exception.BusinessException;
 import pl.pietruszynski.loyaltyclub.exception.ResourceNotFoundException;
+import pl.pietruszynski.loyaltyclub.api.store.repository.HierarchyPromotionRepository;
 import pl.pietruszynski.loyaltyclub.util.CouponCodeGenerator;
+import pl.pietruszynski.loyaltyclub.util.ReferralCodeGenerator;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -35,12 +37,14 @@ import static org.mockito.Mockito.*;
 class LoyaltyServiceTest {
 
     @Mock private CouponCodeGenerator couponCodeGenerator;
+    @Mock private ReferralCodeGenerator referralCodeGenerator;
     @Mock private CustomerRepository customerRepository;
     @Mock private TransactionRepository transactionRepository;
     @Mock private CouponTemplateRepository couponTemplateRepository;
     @Mock private CouponPrefixRepository couponPrefixRepository;
     @Mock private CustomerCouponRepository customerCouponRepository;
     @Mock private StorePointsPromotionRepository storePointsPromotionRepository;
+    @Mock private HierarchyPromotionRepository hierarchyPromotionRepository;
 
     @InjectMocks
     private LoyaltyService loyaltyService;
@@ -48,6 +52,8 @@ class LoyaltyServiceTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(loyaltyService, "availableCountryCodesConfig", "PL,DE");
+        when(referralCodeGenerator.generate(10)).thenReturn("REFCODE12345");
+        when(customerRepository.existsByReferralCode(anyString())).thenReturn(false);
     }
 
     // -----------------------------------------------------------------------

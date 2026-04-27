@@ -33,6 +33,7 @@ import pl.pietruszynski.loyaltyclub.api.store.repository.StorePointsPromotionRep
 import pl.pietruszynski.loyaltyclub.exception.BusinessException;
 import pl.pietruszynski.loyaltyclub.exception.ResourceNotFoundException;
 import pl.pietruszynski.loyaltyclub.util.CouponCodeGenerator;
+import pl.pietruszynski.loyaltyclub.util.ReferralCodeGenerator;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -55,6 +56,7 @@ public class LoyaltyService {
     private static final String COUNTRY_NOT_ALLOWED = "Country code is not allowed";
 
     private final CouponCodeGenerator couponCodeGenerator;
+    private final ReferralCodeGenerator referralCodeGenerator;
 
     private final CustomerRepository customerRepository;
     private final TransactionRepository transactionRepository;
@@ -96,6 +98,11 @@ public class LoyaltyService {
 
     @Transactional
     public Customer createCustomer(Customer customer, String countryScope) {
+        return createCustomer(customer, countryScope, null);
+    }
+
+    @Transactional
+    public Customer createCustomer(Customer customer, String countryScope, String referrerCustomerNumber) {
         validateCustomerForCreate(customer);
         String normalizedCountry = normalizeCountryCode(customer.getCountry());
         ensureInScope(normalizedCountry, countryScope);
@@ -116,6 +123,20 @@ public class LoyaltyService {
             customer.setLoyaltyPoints(0);
         }
         customer.setCountry(normalizedCountry);
+
+        if (referrerCustomerNumber != null && !referrerCustomerNumber.isBlank()) {
+            Customer referrer = customerRepository.findByCustomerNumber(referrerCustomerNumber.trim())
+                    .orElseThrow(() -> new BusinessException("Referrer customer not found"));
+            ensureInScope(referrer.getCountry(), countryScope);
+            customer.setReferredBy(referrer);
+        }
+
+        String code;
+        do {
+            code = referralCodeGenerator.generate(10);
+        } while (customerRepository.existsByReferralCode(code));
+        customer.setReferralCode(code);
+
         return customerRepository.save(customer);
     }
 

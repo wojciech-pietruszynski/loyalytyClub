@@ -21,6 +21,16 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT c FROM Customer c WHERE c.customerNumber = :customerNumber")
     Optional<Customer> findByCustomerNumberForUpdate(String customerNumber);
+
+    boolean existsByReferralCode(String referralCode);
+
+    long countByCountry(String country);
+
+    @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(c.loyaltyPoints), 0) FROM Customer c")
+    long sumLoyaltyPoints();
+
+    @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(c.loyaltyPoints), 0) FROM Customer c WHERE c.country = :country")
+    long sumLoyaltyPointsByCountry(String country);
 }
 
 

@@ -119,6 +119,10 @@ JWT tokens expire after **15 minutes** and are auto-refreshed by the frontend wh
 | POST | `/api/admin/tools/import-customers` | ADMIN, TECHNICAL | CSV bulk import |
 | GET | `/api/admin/config/countries` | ADMIN, TECHNICAL | Available country codes |
 | GET | `/api/admin/config/coupon-prefixes` | ADMIN, TECHNICAL | Coupon prefix config |
+| GET | `/api/admin/reports/dashboard` | ADMIN, TECHNICAL | Summary: customer count, total points, transactions (30d), scoped by country for TECHNICAL |
+| GET | `/api/admin/reports/export/customers` | ADMIN, TECHNICAL | CSV export of customers (tier + referral code columns) |
+| GET | `/api/admin/reports/export/transactions` | ADMIN, TECHNICAL | CSV export of transactions (`from` / `to` ISO date-time query params) |
+| GET | `/api/admin/audit/logs` | ADMIN | Paginated admin audit log (mutating actions from panel) |
 
 ### Store API — `/api/store/**`
 | Method | Path | Description |
@@ -133,6 +137,19 @@ JWT tokens expire after **15 minutes** and are auto-refreshed by the frontend wh
 |--------|------|-------------|
 | POST | `/api/coupon/redeem-points` | Redeem points for coupon (header: `Idempotency-Key`) |
 | GET | `/api/coupon/validate` | Validate coupon (params: `couponCode`, `customerNumber`) |
+
+**E-commerce integration:** use **HTTP Basic** or **JWT** (Bearer) with role `ECOM` for both `/api/coupon/**` and `/api/ecom/**`.
+
+### E-commerce read API — `/api/ecom/**`
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/ecom` | Integration metadata (`apiVersion`, pointers to profile vs coupon APIs) |
+| GET | `/api/ecom/customers/{customerNumber}/points` | Same balance breakdown as store (`pending` / `available` / `expired`) |
+| GET | `/api/ecom/customers/{customerNumber}/profile` | Profile + tier + referral fields |
+| GET | `/api/ecom/customers/{customerNumber}/transactions` | Transaction history (same shape as admin list) |
+| GET | `/api/ecom/customers/{customerNumber}/coupons` | Issued coupons for the customer |
+
+Point accrual and returns remain on **`/api/store`** (POS). Coupon redemption and validation remain on **`/api/coupon`**.
 
 ---
 
@@ -204,6 +221,8 @@ Managed by **Liquibase**. Master changelog: `src/main/resources/db/changelog-mas
 | `006_store_transaction_lifecycle_and_promotions.sql` | Transaction state machine, store_promotions table |
 | `007_store_transaction_source_number.sql` | Source number field on transactions |
 | `008_coupon_redemption_idempotency.sql` | Idempotency key table for coupon redemption |
+| `009_hierarchy_promotions.sql` | Hierarchy promotions |
+| `010_audit_tiers_referrals.sql` | Admin audit log, tier definitions (BRONZE/SILVER/GOLD), referral columns on customers |
 
 Migrations are **additive and idempotent** — never modify existing changesets.
 
@@ -494,6 +513,8 @@ Zarządzane przez **Liquibase**. Masterowy changelog: `src/main/resources/db/cha
 | `006_store_transaction_lifecycle_and_promotions.sql` | Maszyna stanów transakcji, tabela store_promotions |
 | `007_store_transaction_source_number.sql` | Pole numeru źródłowego transakcji |
 | `008_coupon_redemption_idempotency.sql` | Tabela kluczy idempotentności dla realizacji kuponów |
+| `009_hierarchy_promotions.sql` | Promocje hierarchii produktów |
+| `010_audit_tiers_referrals.sql` | Log audytu admina, progi poziomów (BRONZE/SILVER/GOLD), kolumny poleceń przy klientach |
 
 Migracje są **addytywne i idempotentne** — nie modyfikuj istniejących changesetów.
 

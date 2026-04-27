@@ -27,7 +27,9 @@ import pl.pietruszynski.loyaltyclub.api.admin.model.CustomerCoupon;
 import pl.pietruszynski.loyaltyclub.api.admin.model.Transaction;
 import pl.pietruszynski.loyaltyclub.api.store.model.HierarchyPromotion;
 import pl.pietruszynski.loyaltyclub.api.store.model.StorePointsPromotion;
+import pl.pietruszynski.loyaltyclub.api.admin.audit.Auditable;
 import pl.pietruszynski.loyaltyclub.api.admin.service.LoyaltyService;
+import pl.pietruszynski.loyaltyclub.api.admin.service.LoyaltyTierService;
 import pl.pietruszynski.loyaltyclub.api.admin.service.TechnicalUserService;
 
 import java.util.List;
@@ -40,6 +42,7 @@ public class LoyaltyController {
 
     private final LoyaltyService loyaltyService;
     private final TechnicalUserService technicalUserService;
+    private final LoyaltyTierService loyaltyTierService;
 
     @GetMapping("/customers")
     public List<CustomerDto> getAllCustomers(Authentication authentication) {
@@ -69,23 +72,27 @@ public class LoyaltyController {
 
     @PostMapping("/store-promotions")
     @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICAL')")
+    @Auditable(value = "CREATE_STORE_PROMOTION", resourceType = "STORE_PROMOTION")
     public StorePromotionDto createStorePromotion(@Valid @RequestBody StorePromotionCreateRequest request, Authentication authentication) {
         return mapToStorePromotionDto(loyaltyService.createStorePromotion(request, getCountryScope(authentication)));
     }
 
     @PutMapping("/store-promotions/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICAL')")
+    @Auditable(value = "UPDATE_STORE_PROMOTION", resourceType = "STORE_PROMOTION", capturePathId = true)
     public StorePromotionDto updateStorePromotion(@PathVariable Long id, @Valid @RequestBody StorePromotionCreateRequest request, Authentication authentication) {
         return mapToStorePromotionDto(loyaltyService.updateStorePromotion(id, request, getCountryScope(authentication)));
     }
 
     @PatchMapping("/store-promotions/{id}/status")
     @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICAL')")
+    @Auditable(value = "SET_STORE_PROMOTION_STATUS", resourceType = "STORE_PROMOTION", capturePathId = true)
     public StorePromotionDto setStorePromotionStatus(@PathVariable Long id, @Valid @RequestBody StorePromotionStatusRequest request, Authentication authentication) {
         return mapToStorePromotionDto(loyaltyService.setStorePromotionEnabled(id, request.enabled(), getCountryScope(authentication)));
     }
 
     @PostMapping("/customers")
+    @Auditable(value = "CREATE_CUSTOMER", resourceType = "CUSTOMER")
     public CustomerDto createCustomer(@Valid @RequestBody CustomerDto dto, Authentication authentication) {
         Customer customer = Customer.builder()
                 .firstName(dto.getFirstName())
@@ -96,7 +103,7 @@ public class LoyaltyController {
                 .country(dto.getCountry())
                 .loyaltyPoints(dto.getLoyaltyPoints() != null ? dto.getLoyaltyPoints() : 0)
                 .build();
-        return mapToCustomerDto(loyaltyService.createCustomer(customer, getCountryScope(authentication)));
+        return mapToCustomerDto(loyaltyService.createCustomer(customer, getCountryScope(authentication), dto.getReferrerCustomerNumber()));
     }
 
     @GetMapping("/customers/{id}")
@@ -105,6 +112,7 @@ public class LoyaltyController {
     }
 
     @PutMapping("/customers/{id}")
+    @Auditable(value = "UPDATE_CUSTOMER", resourceType = "CUSTOMER", capturePathId = true)
     public CustomerDto updateCustomer(@PathVariable Long id, @Valid @RequestBody CustomerDto dto, Authentication authentication) {
         Customer updates = Customer.builder()
                 .firstName(dto.getFirstName())
@@ -138,6 +146,7 @@ public class LoyaltyController {
 
     @PostMapping("/customers/{id}/add-points")
     @PreAuthorize("hasRole('ADMIN')")
+    @Auditable(value = "ADD_POINTS", resourceType = "CUSTOMER", capturePathId = true)
     public ResponseEntity<Void> addPoints(@PathVariable Long id, @Valid @RequestBody PointsRequest request) {
         loyaltyService.addPoints(id, request.points(), request.description());
         return ResponseEntity.ok().build();
@@ -158,11 +167,13 @@ public class LoyaltyController {
     }
 
     @PostMapping("/coupon-templates")
+    @Auditable(value = "CREATE_COUPON_TEMPLATE", resourceType = "COUPON_TEMPLATE")
     public CouponTemplateDto createCouponTemplate(@Valid @RequestBody CouponTemplateCreateRequest request, Authentication authentication) {
         return mapToCouponTemplateDto(loyaltyService.createCouponTemplate(request, getCountryScope(authentication)));
     }
 
     @PostMapping("/coupons/issue")
+    @Auditable(value = "ISSUE_COUPON", resourceType = "CUSTOMER_COUPON")
     public CustomerCouponDto issueCoupon(@Valid @RequestBody CouponIssueRequest request, Authentication authentication) {
         return mapToCustomerCouponDto(loyaltyService.issueCoupon(request, getCountryScope(authentication)));
     }
@@ -177,23 +188,27 @@ public class LoyaltyController {
 
     @PostMapping("/hierarchy-promotions")
     @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICAL')")
+    @Auditable(value = "CREATE_HIERARCHY_PROMOTION", resourceType = "HIERARCHY_PROMOTION")
     public HierarchyPromotionDto createHierarchyPromotion(@Valid @RequestBody HierarchyPromotionCreateRequest request, Authentication authentication) {
         return mapToHierarchyPromotionDto(loyaltyService.createHierarchyPromotion(request, getCountryScope(authentication)));
     }
 
     @PutMapping("/hierarchy-promotions/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICAL')")
+    @Auditable(value = "UPDATE_HIERARCHY_PROMOTION", resourceType = "HIERARCHY_PROMOTION", capturePathId = true)
     public HierarchyPromotionDto updateHierarchyPromotion(@PathVariable Long id, @Valid @RequestBody HierarchyPromotionCreateRequest request, Authentication authentication) {
         return mapToHierarchyPromotionDto(loyaltyService.updateHierarchyPromotion(id, request, getCountryScope(authentication)));
     }
 
     @PatchMapping("/hierarchy-promotions/{id}/status")
     @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICAL')")
+    @Auditable(value = "SET_HIERARCHY_PROMOTION_STATUS", resourceType = "HIERARCHY_PROMOTION", capturePathId = true)
     public HierarchyPromotionDto setHierarchyPromotionStatus(@PathVariable Long id, @Valid @RequestBody StorePromotionStatusRequest request, Authentication authentication) {
         return mapToHierarchyPromotionDto(loyaltyService.setHierarchyPromotionEnabled(id, request.enabled(), getCountryScope(authentication)));
     }
 
     @PostMapping(value = "/tools/import-customers", consumes = "multipart/form-data")
+    @Auditable(value = "IMPORT_CUSTOMERS_CSV", resourceType = "CUSTOMER")
     public ResponseEntity<Map<String, Object>> importCustomersCsv(@RequestPart("file") MultipartFile file, Authentication authentication) {
         int importedCount = loyaltyService.importCustomersFromCsv(file, getCountryScope(authentication));
         return ResponseEntity.ok(Map.of("importedCount", importedCount));
@@ -209,6 +224,9 @@ public class LoyaltyController {
                 .phoneNumber(customer.getPhoneNumber())
                 .country(customer.getCountry())
                 .loyaltyPoints(customer.getLoyaltyPoints())
+                .referrerCustomerNumber(null)
+                .referralCode(customer.getReferralCode())
+                .loyaltyTierCode(loyaltyTierService.resolveTierCode(customer.getLoyaltyPoints()))
                 .build();
     }
 

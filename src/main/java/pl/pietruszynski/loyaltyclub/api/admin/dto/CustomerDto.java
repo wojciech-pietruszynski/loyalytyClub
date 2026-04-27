@@ -29,6 +29,15 @@ public class CustomerDto {
     private String country;
     @PositiveOrZero(message = "Loyalty points cannot be negative")
     private Integer loyaltyPoints;
+
+    /** Optional: existing customer's number who referred this registration (create only). */
+    private String referrerCustomerNumber;
+
+    /** Populated on read responses. */
+    private String referralCode;
+
+    /** Populated on read responses — derived from tier definitions and point balance. */
+    private String loyaltyTierCode;
 }
 
 

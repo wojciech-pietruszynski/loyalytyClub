@@ -15,7 +15,9 @@ import pl.pietruszynski.loyaltyclub.api.admin.dto.*;
 import pl.pietruszynski.loyaltyclub.api.admin.model.*;
 import pl.pietruszynski.loyaltyclub.api.admin.security.AdminUserDetailsService;
 import pl.pietruszynski.loyaltyclub.api.admin.security.JwtService;
+import org.junit.jupiter.api.BeforeEach;
 import pl.pietruszynski.loyaltyclub.api.admin.service.LoyaltyService;
+import pl.pietruszynski.loyaltyclub.api.admin.service.LoyaltyTierService;
 import pl.pietruszynski.loyaltyclub.api.admin.service.TechnicalUserService;
 import pl.pietruszynski.loyaltyclub.api.ecom.security.EcomUserDetailsService;
 import pl.pietruszynski.loyaltyclub.api.store.model.HierarchyPromotion;
@@ -39,9 +41,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
                 UserDetailsServiceAutoConfiguration.class})
 class LoyaltyControllerTest {
 
+    @BeforeEach
+    void stubTier() {
+        when(loyaltyTierService.resolveTierCode(anyInt())).thenReturn("BRONZE");
+    }
+
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
     @MockBean LoyaltyService loyaltyService;
+    @MockBean LoyaltyTierService loyaltyTierService;
     @MockBean TechnicalUserService technicalUserService;
     @MockBean JwtService jwtService;
     @MockBean AdminUserDetailsService adminUserDetailsService;
@@ -95,7 +103,7 @@ class LoyaltyControllerTest {
     @Test
     void createCustomer_valid_shouldReturn200() throws Exception {
         Customer saved = customer(1L, "new@pl.com", "PL");
-        when(loyaltyService.createCustomer(any(), isNull())).thenReturn(saved);
+        when(loyaltyService.createCustomer(any(), isNull(), isNull())).thenReturn(saved);
 
         CustomerDto dto = CustomerDto.builder()
                 .firstName("Jan").lastName("Kowalski")
