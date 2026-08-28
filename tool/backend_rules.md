@@ -329,7 +329,7 @@ class MyControllerTest {
 - Kolejność etapów: Checkout → Testy → SonarQube → Build → Stop → Archive → Deploy → Start
 - Token SonarQube: Jenkins credential `loyalty-club` (typ: Secret text)
 - Testy: `mvn test -P build-backend`
-- Build: `mvn clean package -P build-frontend -DskipTests`
+- Build: `mvn clean package -DskipTests`
 - Analiza: `mvn sonar:sonar -Dsonar.login=${SONAR_TOKEN}`
 
 ---

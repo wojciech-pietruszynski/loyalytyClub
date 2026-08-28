@@ -1,6 +1,7 @@
 package pl.pietruszynski.loyaltyclub.config;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -15,6 +16,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import pl.pietruszynski.loyaltyclub.api.admin.security.AdminUserDetailsService;
 import pl.pietruszynski.loyaltyclub.api.admin.security.JwtAuthFilter;
 import pl.pietruszynski.loyaltyclub.api.ecom.security.EcomUserDetailsService;
@@ -33,7 +37,8 @@ public class SecurityConfig {
     private final EcomUserDetailsService ecomUserDetailsService;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http,
+                                                   CorsConfigurationSource corsConfigurationSource) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .httpBasic(Customizer.withDefaults())
@@ -41,12 +46,9 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> response.setStatus(401))
                 )
+                .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/",
-                                "/index.html",
-                                "/assets/**",
-                                "/favicon.ico",
                                 "/error",
                                 "/api/admin/auth/login",
                                 "/api/store/auth/login"
@@ -64,6 +66,27 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    /**
+     * Originy frontendu dopuszczone do wywolan cross-origin. Pusta lista (domyslnie)
+     * oznacza brak zarejestrowanych mapowan, czyli CORS wylaczony — wariant,
+     * w ktorym SPA i API stoja za jednym reverse proxy.
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource(
+            @Value("${app.cors.allowed-origins:}") List<String> allowedOrigins) {
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        if (allowedOrigins.isEmpty()) {
+            return source;
+        }
+
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(allowedOrigins);
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
+        source.registerCorsConfiguration("/api/**", configuration);
+        return source;
     }
 
     @Bean

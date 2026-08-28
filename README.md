@@ -1,6 +1,8 @@
-# LoyaltyClub — Loyalty Program System
+# LoyaltyClub — Loyalty Program System (Backend)
 
-A full-stack **enterprise loyalty program** application built with Java 21 + Spring Boot 3.2 and React 19 + TypeScript. It enables customer management, loyalty point accrual via POS transactions, coupon issuance and redemption, and a multi-role admin panel with country-scoped access control.
+The **backend** of an enterprise loyalty program, built with Java 21 + Spring Boot 3.2. It exposes the REST API for customer management, loyalty point accrual via POS transactions, coupon issuance and redemption, and a multi-role admin API with country-scoped access control.
+
+> The React admin panel lives in a separate repository: **loyaltyClub-frontend**. This repository no longer builds or embeds it.
 
 ---
 
@@ -35,32 +37,24 @@ A full-stack **enterprise loyalty program** application built with Java 21 + Spr
 | SonarQube / Sonar Maven | 4.0.0 | Static code analysis |
 | Maven | — | Build tool |
 
-### Frontend
-| Technology | Version | Role |
-|------------|---------|------|
-| React | 19.2.0 | UI framework |
-| TypeScript | strict | Type safety |
-| Vite | 7.3.1 | Build tool / Dev server |
-| Ant Design | 5.27.6 | Component library |
-| Axios | 1.13.5 | HTTP client |
-| Vitest | 3.2.4 | Unit test runner |
-| @testing-library/react | 16.3.2 | Component testing |
-| lucide-react | — | Icons |
-
 ---
 
 ## Architecture
 
-The application is a **monorepo** — the Maven build compiles the React frontend and embeds it as static resources inside the Spring Boot JAR. In production, a single process serves both the API and the SPA.
+The backend is an **API-only** Spring Boot service. The React SPA is built and deployed independently from its own repository and talks to this service over HTTP.
 
 ```
-Browser ──► Spring Boot (port 8089)
-               ├── /api/admin/**     Admin panel REST API
-               ├── /api/store/**     POS terminal REST API
-               ├── /api/ecom/**      E-commerce REST API
-               ├── /api/coupon/**    Coupon redemption REST API
-               └── /**              React SPA (static resources)
+Browser ──► SPA (static hosting / reverse proxy)
+               └──► Spring Boot (port 8089)
+                       ├── /api/admin/**     Admin panel REST API
+                       ├── /api/store/**     POS terminal REST API
+                       ├── /api/ecom/**      E-commerce REST API
+                       └── /api/coupon/**    Coupon redemption REST API
 ```
+
+Two supported topologies:
+- **Same origin** — a reverse proxy serves the SPA and forwards `/api` here. No CORS needed (default).
+- **Separate origins** — the SPA is served from its own host; set `app.cors.allowed-origins` (env `CORS_ALLOWED_ORIGINS`) to that origin.
 
 **Backend domain packages:**
 ```
@@ -159,7 +153,6 @@ Point accrual and returns remain on **`/api/store`** (POS). Coupon redemption an
 - Docker Desktop
 - JDK 21
 - Maven 3.x
-- Node.js 20 *(installed automatically by Maven build)*
 
 ### 1. Start the database
 ```bash
@@ -168,19 +161,15 @@ docker-compose up -d
 This starts PostgreSQL 15 on port **5433** (container port 5432).
 Credentials: `user / password`, database: `loyalty_db`.
 
-### 2. Build & run (full stack)
+### 2. Build & run
 ```bash
-mvn clean package -P build-frontend
+mvn clean package
 java -jar target/loyalty-club-0.0.1-SNAPSHOT.jar
 ```
-The application will be available at **http://localhost:8089**
+The API will be available at **http://localhost:8089**
 
-### 3. Frontend dev server (hot reload)
-```bash
-cd frontend
-npm run dev
-```
-Vite starts on port **5173** and proxies all `/api` requests to `http://localhost:8089`.
+### 3. Admin panel
+Clone the frontend repository and follow its README. Its dev server proxies `/api` to `http://localhost:8089` out of the box.
 
 ---
 
@@ -189,7 +178,7 @@ Vite starts on port **5173** and proxies all `/api` requests to `http://localhos
 | Profile | Command | What it does |
 |---------|---------|-------------|
 | `build-backend` | `mvn test -P build-backend` | Compile + unit test backend only |
-| `build-frontend` | `mvn clean package -P build-frontend -DskipTests` | Install Node 20, run frontend tests, build React app, copy to `src/main/resources/static/`, compile and package the Spring Boot JAR |
+| `e2e` | `mvn verify -P e2e -DskipTests` | Start Postgres + the app, run Playwright API tests from `e2e/` |
 
 ---
 
@@ -204,6 +193,7 @@ Key properties in `src/main/resources/application.properties`:
 | `app.jwt.secret` | *(base64 key)* | HMAC-SHA512 secret — override via `JWT_SECRET` env var in production |
 | `app.available-country-codes` | `PL,DE,CZ,SK,LT` | Countries enabled for multi-tenancy |
 | `app.default-store-points-rate` | `1.00` | Points earned per currency unit |
+| `app.cors.allowed-origins` | *(empty)* | Comma-separated frontend origins allowed for CORS on `/api/**`. Empty disables CORS — override via `CORS_ALLOWED_ORIGINS` |
 | `spring.datasource.url` | `jdbc:postgresql://localhost:5433/loyalty_db` | Database URL |
 
 ---
@@ -246,12 +236,7 @@ mvn test -P build-backend
 Coverage target: **≥ 90%** line coverage for service and controller classes.
 Excluded from coverage: `**/config/**`, `LoyaltyClubApplication.java`.
 
-### Frontend
-17 test files using Vitest + @testing-library/react.
-
-```bash
-cd frontend && npm test
-```
+Frontend tests live in the frontend repository.
 
 ---
 
@@ -262,9 +247,9 @@ Jenkins declarative pipeline at `jenkins/build.jenkinsfile`.
 | Stage | Description |
 |-------|-------------|
 | Checkout | Clone repository |
-| Backend Tests | `mvn test -P build-backend`, publishes JUnit XML |
+| Unit Tests | `mvn test -P build-backend`, publishes JUnit XML |
 | SonarQube Analysis | `mvn sonar:sonar` using Jenkins credential `loyalty-club` |
-| Full-Stack Build | `mvn clean package -P build-frontend -DskipTests` |
+| Backend Build | `mvn clean package -DskipTests` |
 | Stop & Archive | Kill previous process, archive JAR with timestamp |
 | Deploy | Copy JAR to `/home/wojciech/loyalty-club-builds/` |
 | Start | Launch with `java -Xms512M -Xmx1G -XX:+UseG1GC -jar ...` |
@@ -282,34 +267,27 @@ loyaltyclub/
 │   │   ├── java/pl/pietruszynski/loyaltyclub/   ← Spring Boot source
 │   │   └── resources/
 │   │       ├── application.properties
-│   │       ├── db/                              ← Liquibase migrations
-│   │       └── static/                          ← Built React app (generated)
+│   │       └── db/                              ← Liquibase migrations
 │   └── test/java/...                            ← JUnit test classes
-├── frontend/
-│   ├── src/
-│   │   ├── api/client.ts                        ← Axios + JWT interceptors
-│   │   ├── components/                          ← Presentational components
-│   │   ├── hooks/                               ← Business logic hooks
-│   │   ├── types/                               ← TypeScript domain types
-│   │   └── i18n/                                ← PL / EN / DE translations
-│   ├── package.json
-│   └── vite.config.ts
 ├── jenkins/build.jenkinsfile                    ← CI/CD pipeline
 ├── tool/
 │   ├── backend_rules.md                         ← Backend coding standards
-│   ├── frontend_rules.md                        ← Frontend coding standards
 │   └── information/                             ← Presentation materials
 ├── docker-compose.yml                           ← PostgreSQL 15 service
 └── pom.xml
 ```
 
----
+The React admin panel is maintained in its own repository (`loyaltyClub-frontend`), together with its coding standards (`docs/frontend_rules.md`).
 
 ---
 
-# LoyaltyClub — System Programu Lojalnościowego
+---
 
-Pełnostackowa aplikacja **enterprise loyalty program** zbudowana w technologii Java 21 + Spring Boot 3.2 oraz React 19 + TypeScript. Umożliwia zarządzanie klientami, naliczanie punktów lojalnościowych przez transakcje kasowe, emisję i realizację kuponów oraz wielorolowy panel administracyjny z kontrolą dostępu ograniczoną do krajów.
+# LoyaltyClub — System Programu Lojalnościowego (Backend)
+
+**Backend** aplikacji enterprise loyalty program zbudowany w technologii Java 21 + Spring Boot 3.2. Udostępnia REST API do zarządzania klientami, naliczania punktów lojalnościowych przez transakcje kasowe, emisji i realizacji kuponów oraz wielorolowe API administracyjne z kontrolą dostępu ograniczoną do krajów.
+
+> Panel administracyjny w React znajduje się w osobnym repozytorium: **loyaltyClub-frontend**. To repozytorium już go nie buduje ani nie osadza w JAR-ze.
 
 ---
 
@@ -344,32 +322,24 @@ Pełnostackowa aplikacja **enterprise loyalty program** zbudowana w technologii 
 | SonarQube / Sonar Maven | 4.0.0 | Statyczna analiza kodu |
 | Maven | — | Narzędzie budowania |
 
-### Frontend
-| Technologia | Wersja | Rola |
-|-------------|--------|------|
-| React | 19.2.0 | Framework UI |
-| TypeScript | strict | Typowanie statyczne |
-| Vite | 7.3.1 | Build tool / serwer deweloperski |
-| Ant Design | 5.27.6 | Biblioteka komponentów |
-| Axios | 1.13.5 | Klient HTTP |
-| Vitest | 3.2.4 | Framework testów jednostkowych |
-| @testing-library/react | 16.3.2 | Testowanie komponentów |
-| lucide-react | — | Ikony |
-
 ---
 
 ## Architektura
 
-Projekt jest **monorepo** — Maven kompiluje frontend React i osadza go jako zasoby statyczne wewnątrz pliku JAR Spring Boot. W środowisku produkcyjnym jeden proces obsługuje zarówno API, jak i SPA.
+Backend jest serwisem **wyłącznie API**. SPA w React jest budowana i wdrażana niezależnie, z własnego repozytorium, i komunikuje się z tym serwisem po HTTP.
 
 ```
-Przeglądarka ──► Spring Boot (port 8089)
-                    ├── /api/admin/**     API panelu administracyjnego
-                    ├── /api/store/**     API terminala kasowego
-                    ├── /api/ecom/**      API integracji e-commerce
-                    ├── /api/coupon/**    API realizacji kuponów
-                    └── /**              React SPA (zasoby statyczne)
+Przeglądarka ──► SPA (hosting statyczny / reverse proxy)
+                    └──► Spring Boot (port 8089)
+                            ├── /api/admin/**     API panelu administracyjnego
+                            ├── /api/store/**     API terminala kasowego
+                            ├── /api/ecom/**      API integracji e-commerce
+                            └── /api/coupon/**    API realizacji kuponów
 ```
+
+Dwa wspierane warianty wdrożenia:
+- **Ten sam origin** — reverse proxy serwuje SPA i przekazuje `/api` tutaj. CORS niepotrzebny (domyślnie).
+- **Osobne originy** — SPA na własnym hoście; ustaw `app.cors.allowed-origins` (env `CORS_ALLOWED_ORIGINS`) na jej origin.
 
 **Pakiety domenowe backendu:**
 ```
@@ -451,7 +421,6 @@ Tokeny JWT wygasają po **15 minutach** i są automatycznie odświeżane przez f
 - Docker Desktop
 - JDK 21
 - Maven 3.x
-- Node.js 20 *(instalowany automatycznie przez Maven)*
 
 ### 1. Uruchomienie bazy danych
 ```bash
@@ -460,19 +429,15 @@ docker-compose up -d
 Startuje PostgreSQL 15 na porcie **5433** (port kontenera: 5432).
 Poświadczenia: `user / password`, baza: `loyalty_db`.
 
-### 2. Budowa i uruchomienie (pełny stack)
+### 2. Budowa i uruchomienie
 ```bash
-mvn clean package -P build-frontend
+mvn clean package
 java -jar target/loyalty-club-0.0.1-SNAPSHOT.jar
 ```
-Aplikacja dostępna pod adresem **http://localhost:8089**
+API dostępne pod adresem **http://localhost:8089**
 
-### 3. Serwer deweloperski frontendu (hot reload)
-```bash
-cd frontend
-npm run dev
-```
-Vite startuje na porcie **5173** i przekierowuje wszystkie żądania `/api` na `http://localhost:8089`.
+### 3. Panel administracyjny
+Sklonuj repozytorium frontendu i postępuj zgodnie z jego README. Jego serwer deweloperski domyślnie przekierowuje `/api` na `http://localhost:8089`.
 
 ---
 
@@ -481,7 +446,7 @@ Vite startuje na porcie **5173** i przekierowuje wszystkie żądania `/api` na `
 | Profil | Komenda | Co robi |
 |--------|---------|---------|
 | `build-backend` | `mvn test -P build-backend` | Kompilacja i testy jednostkowe wyłącznie backendu |
-| `build-frontend` | `mvn clean package -P build-frontend -DskipTests` | Instalacja Node 20, testy frontendu, budowa aplikacji React, kopiowanie do `src/main/resources/static/`, kompilacja i pakowanie JAR Spring Boot |
+| `e2e` | `mvn verify -P e2e -DskipTests` | Start Postgresa i aplikacji, uruchomienie testów Playwright z katalogu `e2e/` |
 
 ---
 
@@ -496,6 +461,7 @@ Kluczowe właściwości w `src/main/resources/application.properties`:
 | `app.jwt.secret` | *(klucz base64)* | Sekret HMAC-SHA512 — w produkcji nadpisz zmienną env `JWT_SECRET` |
 | `app.available-country-codes` | `PL,DE,CZ,SK,LT` | Kraje włączone w multi-tenancy |
 | `app.default-store-points-rate` | `1.00` | Punkty naliczane za jednostkę waluty |
+| `app.cors.allowed-origins` | *(puste)* | Originy frontendu dopuszczone do CORS na `/api/**`, po przecinku. Puste = CORS wyłączony — nadpisz zmienną `CORS_ALLOWED_ORIGINS` |
 | `spring.datasource.url` | `jdbc:postgresql://localhost:5433/loyalty_db` | URL bazy danych |
 
 ---
@@ -538,12 +504,7 @@ mvn test -P build-backend
 Docelowe pokrycie: **≥ 90%** linii kodu dla klas serwisów i kontrolerów.
 Wykluczone z pokrycia: `**/config/**`, `LoyaltyClubApplication.java`.
 
-### Frontend
-17 plików testowych z użyciem Vitest + @testing-library/react.
-
-```bash
-cd frontend && npm test
-```
+Testy frontendu znajdują się w repozytorium frontendu.
 
 ---
 
@@ -554,9 +515,9 @@ Deklaratywny potok Jenkinsa w pliku `jenkins/build.jenkinsfile`.
 | Etap | Opis |
 |------|------|
 | Pobranie kodu | Klonowanie repozytorium |
-| Testy jednostkowe (Backend) | `mvn test -P build-backend`, publikacja raportów JUnit |
+| Testy jednostkowe | `mvn test -P build-backend`, publikacja raportów JUnit |
 | Analiza SonarQube | `mvn sonar:sonar` z użyciem credentiala Jenkinsa `loyalty-club` |
-| Budowanie Fullstack | `mvn clean package -P build-frontend -DskipTests` |
+| Budowanie Backendu | `mvn clean package -DskipTests` |
 | Zatrzymanie i archiwizacja | Zatrzymanie poprzedniego procesu, archiwizacja JAR ze znacznikiem czasu |
 | Kopiowanie (Deploy) | Kopiowanie JAR do `/home/wojciech/loyalty-club-builds/` |
 | Uruchomienie | Start z `java -Xms512M -Xmx1G -XX:+UseG1GC -jar ...` |
@@ -574,23 +535,14 @@ loyaltyclub/
 │   │   ├── java/pl/pietruszynski/loyaltyclub/   ← Kod źródłowy Spring Boot
 │   │   └── resources/
 │   │       ├── application.properties
-│   │       ├── db/                              ← Migracje Liquibase
-│   │       └── static/                          ← Zbudowana aplikacja React (generowane)
+│   │       └── db/                              ← Migracje Liquibase
 │   └── test/java/...                            ← Klasy testów JUnit
-├── frontend/
-│   ├── src/
-│   │   ├── api/client.ts                        ← Axios + interceptory JWT
-│   │   ├── components/                          ← Komponenty prezentacyjne
-│   │   ├── hooks/                               ← Hooki z logiką biznesową
-│   │   ├── types/                               ← Typy domenowe TypeScript
-│   │   └── i18n/                                ← Tłumaczenia PL / EN / DE
-│   ├── package.json
-│   └── vite.config.ts
 ├── jenkins/build.jenkinsfile                    ← Potok CI/CD
 ├── tool/
 │   ├── backend_rules.md                         ← Standardy kodowania backendu
-│   ├── frontend_rules.md                        ← Standardy kodowania frontendu
 │   └── information/                             ← Materiały prezentacyjne
 ├── docker-compose.yml                           ← Serwis PostgreSQL 15
 └── pom.xml
 ```
+
+Panel administracyjny w React rozwijany jest w osobnym repozytorium (`loyaltyClub-frontend`) wraz ze swoimi standardami kodowania (`docs/frontend_rules.md`).
