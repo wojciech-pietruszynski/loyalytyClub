@@ -52,8 +52,9 @@ class LoyaltyServiceTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(loyaltyService, "availableCountryCodesConfig", "PL,DE");
-        when(referralCodeGenerator.generate(10)).thenReturn("REFCODE12345");
-        when(customerRepository.existsByReferralCode(anyString())).thenReturn(false);
+        // Kod polecenia nadawany jest tylko przy tworzeniu klienta — pozostale testy tych stubow nie uzywaja.
+        lenient().when(referralCodeGenerator.generate(10)).thenReturn("REFCODE12345");
+        lenient().when(customerRepository.existsByReferralCode(anyString())).thenReturn(false);
     }
 
     // -----------------------------------------------------------------------

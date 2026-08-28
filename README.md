@@ -113,10 +113,10 @@ JWT tokens expire after **15 minutes** and are auto-refreshed by the frontend wh
 | POST | `/api/admin/tools/import-customers` | ADMIN, TECHNICAL | CSV bulk import |
 | GET | `/api/admin/config/countries` | ADMIN, TECHNICAL | Available country codes |
 | GET | `/api/admin/config/coupon-prefixes` | ADMIN, TECHNICAL | Coupon prefix config |
-| GET | `/api/admin/reports/dashboard` | ADMIN, TECHNICAL | Summary: customer count, total points, transactions (30d), scoped by country for TECHNICAL |
+| GET | `/api/admin/reports/summary` | ADMIN, TECHNICAL | Summary: customer count, total points, transactions (30d), scoped by country for TECHNICAL |
 | GET | `/api/admin/reports/export/customers` | ADMIN, TECHNICAL | CSV export of customers (tier + referral code columns) |
-| GET | `/api/admin/reports/export/transactions` | ADMIN, TECHNICAL | CSV export of transactions (`from` / `to` ISO date-time query params) |
-| GET | `/api/admin/audit/logs` | ADMIN | Paginated admin audit log (mutating actions from panel) |
+| GET | `/api/admin/reports/export/transactions` | ADMIN, TECHNICAL | CSV export of transactions (optional `from` / `to` ISO date query params) |
+| GET | `/api/admin/audit-logs` | ADMIN | Latest 200 admin audit entries (mutating actions from panel) |
 
 ### Store API — `/api/store/**`
 | Method | Path | Description |
