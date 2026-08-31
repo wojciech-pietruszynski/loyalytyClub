@@ -171,27 +171,53 @@ Point accrual and returns remain on **`/api/store`** (POS). Coupon redemption an
 
 ## Getting Started
 
-### Prerequisites
+### A. Fully containerized (recommended)
+
+Only Docker is required — no JDK, no Maven.
+
+```bash
+./scripts/stack.sh up          # Linux / macOS
+.\scripts\stack.ps1 up          # Windows
+```
+
+The script builds the image, starts PostgreSQL and the backend, waits until
+the container reports `healthy` (Liquibase migrations included) and runs a
+smoke test. The API is then available at **http://localhost:8089**,
+Swagger UI at **/swagger-ui.html**.
+
+Settings are read from `.env` (see `.env.example`): ports, database
+credentials, `JWT_SECRET`. `./scripts/stack.sh down` stops the stack and keeps
+the data; `destroy` also drops the database volume.
+
+> The database port **5433** is published on the host for developer tools only.
+> The backend reaches PostgreSQL over the container network as `db:5432`.
+
+### B. Local run with a JDK
+
+#### Prerequisites
 - Docker Desktop
 - JDK 25
 - Maven 3.9+ (must itself run on JDK 25 — check with `mvn -v`)
 
-### 1. Start the database
+#### 1. Start the database only
 ```bash
-docker-compose up -d
+docker compose up -d db
 ```
 This starts PostgreSQL 15 on port **5433** (container port 5432).
 Credentials: `user / password`, database: `loyalty_db`.
 
-### 2. Build & run
+#### 2. Build & run
 ```bash
 mvn clean package
 java -jar target/loyalty-club-0.0.1-SNAPSHOT.jar
 ```
 The API will be available at **http://localhost:8089**
 
-### 3. Admin panel
-Clone the frontend repository and follow its README. Its dev server proxies `/api` to `http://localhost:8089` out of the box.
+### Admin panel
+Clone the frontend repository and follow its README. In the containerized
+setup its nginx forwards `/api` to this backend over the shared
+`loyaltyclub-net` network; in local development its Vite dev server proxies
+`/api` to `http://localhost:8089` out of the box.
 
 ---
 
@@ -269,23 +295,67 @@ Frontend tests live in the frontend repository.
 
 ## CI/CD Pipeline
 
-Jenkins declarative pipeline at `jenkins/build.jenkinsfile`.
+Everything — building, testing, analysis and running — happens inside Docker.
+The only requirement on the agent (or on a developer machine) is a working
+Docker daemon with BuildKit. No JDK 25, no Maven, no local `~/.m2`.
 
-The agent must provide JDK 25 — the pipeline pins
-`JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64`. Adjust the path if the agent
-installs the JDK elsewhere.
+### Container images
+
+`Dockerfile` is multi-stage; every stage is a separate build target:
+
+| Target | Purpose |
+|--------|---------|
+| `deps` | Resolves Maven dependencies; own layer, so a source change does not re-download them |
+| `test` | `mvn test` — unit tests and the JaCoCo report |
+| `test-reports` | Exports `surefire-reports` and `jacoco` out of the image (`--output`) |
+| `sonar` | `mvn sonar:sonar` reusing the `test` filesystem, so tests are not run twice |
+| `build` | `mvn package` — the executable JAR |
+| `runtime` | `eclipse-temurin:25-jre-alpine`, non-root user, `HEALTHCHECK` on `/actuator/health` |
+
+The Sonar token is passed as a BuildKit secret (`--secret`), not a build
+argument — a build argument would stay visible in the image history.
+
+### Local commands
+
+`scripts/stack.sh` (Linux/CI) and `scripts/stack.ps1` (Windows) wrap the whole
+flow:
+
+| Command | Effect |
+|---------|--------|
+| `build` | Builds the runtime image |
+| `test` | Runs the tests in a container; reports land in `target/docker-reports` |
+| `sonar` | SonarQube analysis (requires `SONAR_TOKEN` in the environment) |
+| `up` | Builds and starts the stack, waits for `healthy`, runs a smoke test |
+| `down` / `destroy` | Stops the stack (`destroy` also drops the database volume) |
+| `logs` / `ps` / `smoke` | Diagnostics of a running deployment |
+
+### Jenkins
+
+Declarative pipeline at `jenkins/build.jenkinsfile`:
 
 | Stage | Description |
 |-------|-------------|
 | Checkout | Clone repository |
-| Unit Tests | `mvn test`, publishes JUnit XML |
-| SonarQube Analysis | `mvn sonar:sonar` using Jenkins credential `loyalty-club` |
-| Backend Build | `mvn clean package -DskipTests` |
-| Stop & Archive | Kill previous process, archive JAR with timestamp |
-| Deploy | Copy JAR to `/home/wojciech/loyalty-club-builds/` |
-| Start | Launch with `java -Xms512M -Xmx1G -XX:+UseG1GC -jar ...` |
+| Unit Tests | `scripts/stack.sh test`, publishes JUnit XML and the coverage report |
+| SonarQube Analysis | `scripts/stack.sh sonar` with Jenkins credential `loyalty-club` |
+| Image Build | `docker build --target runtime`, tagged with the build number and `latest` |
+| Deploy | `docker compose up -d --no-build` |
+| Smoke Test | Waits for `healthy` and probes the API from inside the container network |
+
+Rollback is the deploy stage re-run with an older tag:
+`IMAGE_TAG=<build number> docker compose up -d --no-build`.
 
 SonarQube: `http://192.168.100.150:9000`, project key `loyalty-club`.
+
+The previous pipeline, which deployed a bare JAR onto the agent, is kept at
+`jenkins/build-legacy-jar.jenkinsfile` for reference.
+
+### GitHub Actions
+
+`.github/workflows/ci.yml` is the quality gate for `master` and pull requests:
+it runs the tests through the `test-reports` target, builds the runtime image,
+starts the full stack with Compose, and verifies that the container reports
+`healthy` and that the Liquibase migrations apply to an empty database.
 
 ---
 
@@ -300,11 +370,20 @@ loyaltyclub/
 │   │       ├── application.properties
 │   │       └── db/                              ← Liquibase migrations
 │   └── test/java/...                            ← JUnit test classes
-├── jenkins/build.jenkinsfile                    ← CI/CD pipeline
+├── jenkins/
+│   ├── build.jenkinsfile                        ← CI/CD pipeline (Docker)
+│   └── build-legacy-jar.jenkinsfile             ← Previous JAR-on-agent pipeline
+├── .github/workflows/ci.yml                     ← Quality gate (GitHub Actions)
+├── scripts/
+│   ├── stack.sh                                 ← build / test / sonar / up / down
+│   └── stack.ps1                                ← same, for Windows
 ├── tool/
 │   ├── backend_rules.md                         ← Backend coding standards
 │   └── information/                             ← Presentation materials
-├── docker-compose.yml                           ← PostgreSQL 15 service
+├── Dockerfile                                   ← Multi-stage: deps/test/sonar/build/runtime
+├── .dockerignore
+├── docker-compose.yml                           ← PostgreSQL 15 + backend, network loyaltyclub-net
+├── .env.example                                 ← Deployment settings template
 └── pom.xml
 ```
 
@@ -521,27 +600,52 @@ Tokeny JWT wygasają po **15 minutach** i są automatycznie odświeżane przez f
 
 ## Uruchomienie projektu
 
-### Wymagania wstępne
+### A. W całości w kontenerach (zalecane)
+
+Potrzebny jest wyłącznie Docker — bez JDK i bez Mavena.
+
+```bash
+./scripts/stack.sh up          # Linux / macOS
+.\scripts\stack.ps1 up          # Windows
+```
+
+Skrypt buduje obraz, podnosi PostgreSQL i backend, czeka aż kontener zgłosi
+`healthy` (czyli także po migracjach Liquibase) i wykonuje test dymny. API jest
+wtedy dostępne pod **http://localhost:8089**, Swagger UI pod **/swagger-ui.html**.
+
+Ustawienia czytane są z pliku `.env` (wzorzec: `.env.example`): porty, dane
+dostępowe do bazy, `JWT_SECRET`. `./scripts/stack.sh down` zatrzymuje stos
+i zostawia dane; `destroy` usuwa też wolumen bazy.
+
+> Port bazy **5433** jest wystawiony na hosta wyłącznie dla narzędzi
+> deweloperskich. Backend sięga do PostgreSQL po sieci kontenerów, jako `db:5432`.
+
+### B. Uruchomienie lokalne z JDK
+
+#### Wymagania
 - Docker Desktop
 - JDK 25
-- Maven 3.9+ (musi sam działać na JDK 25 — sprawdź przez `mvn -v`)
+- Maven 3.9+ (sam musi działać na JDK 25 — sprawdź `mvn -v`)
 
-### 1. Uruchomienie bazy danych
+#### 1. Uruchomienie samej bazy
 ```bash
-docker-compose up -d
+docker compose up -d db
 ```
-Startuje PostgreSQL 15 na porcie **5433** (port kontenera: 5432).
-Poświadczenia: `user / password`, baza: `loyalty_db`.
+Startuje PostgreSQL 15 na porcie **5433** (port kontenera 5432).
+Dane dostępowe: `user / password`, baza: `loyalty_db`.
 
-### 2. Budowa i uruchomienie
+#### 2. Budowanie i uruchomienie
 ```bash
 mvn clean package
 java -jar target/loyalty-club-0.0.1-SNAPSHOT.jar
 ```
-API dostępne pod adresem **http://localhost:8089**
+API będzie dostępne pod **http://localhost:8089**
 
-### 3. Panel administracyjny
-Sklonuj repozytorium frontendu i postępuj zgodnie z jego README. Jego serwer deweloperski domyślnie przekierowuje `/api` na `http://localhost:8089`.
+### Panel administracyjny
+Sklonuj repozytorium frontendu i postępuj zgodnie z jego README. We wdrożeniu
+kontenerowym jego nginx przekazuje `/api` do tego backendu po współdzielonej
+sieci `loyaltyclub-net`; przy pracy lokalnej serwer deweloperski Vite
+przekierowuje `/api` na `http://localhost:8089` bez dodatkowej konfiguracji.
 
 ---
 
@@ -619,23 +723,67 @@ Testy frontendu znajdują się w repozytorium frontendu.
 
 ## Potok CI/CD
 
-Deklaratywny potok Jenkinsa w pliku `jenkins/build.jenkinsfile`.
+Całość — budowanie, testy, analiza i uruchomienie — dzieje się w Dockerze.
+Jedyne, czego wymaga agent (albo maszyna dewelopera), to działający demon
+Dockera z BuildKitem. Bez JDK 25, bez Mavena, bez lokalnego `~/.m2`.
 
-Agent musi udostępniać JDK 25 — potok ustawia na sztywno
-`JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64`. Jeśli agent instaluje JDK
-w innym miejscu, popraw tę ścieżkę.
+### Obrazy kontenerów
+
+`Dockerfile` jest wieloetapowy; każdy etap to osobny cel budowania:
+
+| Cel | Przeznaczenie |
+|-----|---------------|
+| `deps` | Pobranie zależności Mavena; osobna warstwa, więc zmiana kodu nie pobiera ich ponownie |
+| `test` | `mvn test` — testy jednostkowe i raport JaCoCo |
+| `test-reports` | Wystawienie `surefire-reports` i `jacoco` poza obraz (`--output`) |
+| `sonar` | `mvn sonar:sonar` na systemie plików etapu `test`, więc testy nie lecą drugi raz |
+| `build` | `mvn package` — wykonywalny JAR |
+| `runtime` | `eclipse-temurin:25-jre-alpine`, użytkownik bez roota, `HEALTHCHECK` na `/actuator/health` |
+
+Token Sonara idzie jako sekret BuildKita (`--secret`), a nie argument
+budowania — argument zostałby widoczny w historii obrazu.
+
+### Polecenia lokalne
+
+`scripts/stack.sh` (Linux/CI) oraz `scripts/stack.ps1` (Windows) obsługują
+cały przepływ:
+
+| Polecenie | Efekt |
+|-----------|-------|
+| `build` | Zbudowanie obrazu wykonawczego |
+| `test` | Testy w kontenerze; raporty trafiają do `target/docker-reports` |
+| `sonar` | Analiza SonarQube (wymaga `SONAR_TOKEN` w środowisku) |
+| `up` | Zbudowanie i uruchomienie stosu, czekanie na `healthy`, test dymny |
+| `down` / `destroy` | Zatrzymanie stosu (`destroy` usuwa też wolumen bazy) |
+| `logs` / `ps` / `smoke` | Diagnostyka działającego wdrożenia |
+
+### Jenkins
+
+Deklaratywny potok w pliku `jenkins/build.jenkinsfile`:
 
 | Etap | Opis |
 |------|------|
 | Pobranie kodu | Klonowanie repozytorium |
-| Testy jednostkowe | `mvn test`, publikacja raportów JUnit |
-| Analiza SonarQube | `mvn sonar:sonar` z użyciem credentiala Jenkinsa `loyalty-club` |
-| Budowanie Backendu | `mvn clean package -DskipTests` |
-| Zatrzymanie i archiwizacja | Zatrzymanie poprzedniego procesu, archiwizacja JAR ze znacznikiem czasu |
-| Kopiowanie (Deploy) | Kopiowanie JAR do `/home/wojciech/loyalty-club-builds/` |
-| Uruchomienie | Start z `java -Xms512M -Xmx1G -XX:+UseG1GC -jar ...` |
+| Testy jednostkowe | `scripts/stack.sh test`, publikacja JUnit i raportu pokrycia |
+| Analiza SonarQube | `scripts/stack.sh sonar` z credentialem Jenkinsa `loyalty-club` |
+| Budowanie obrazu | `docker build --target runtime`, znaczniki: numer budowania i `latest` |
+| Wdrożenie | `docker compose up -d --no-build` |
+| Test dymny | Czekanie na `healthy` i odpytanie API z wnętrza sieci kontenerów |
+
+Wycofanie zmiany to powtórzenie etapu wdrożenia ze starszym znacznikiem:
+`IMAGE_TAG=<numer budowania> docker compose up -d --no-build`.
 
 SonarQube: `http://192.168.100.150:9000`, klucz projektu `loyalty-club`.
+
+Poprzedni potok, który wdrażał goły JAR na agenta, został zachowany
+w `jenkins/build-legacy-jar.jenkinsfile`.
+
+### GitHub Actions
+
+`.github/workflows/ci.yml` to bramka jakości dla `master` i zadań scalenia:
+uruchamia testy celem `test-reports`, buduje obraz wykonawczy, podnosi pełny
+stos przez Compose i sprawdza, czy kontener zgłasza `healthy`, a migracje
+Liquibase przechodzą na pustej bazie.
 
 ---
 
@@ -650,11 +798,20 @@ loyaltyclub/
 │   │       ├── application.properties
 │   │       └── db/                              ← Migracje Liquibase
 │   └── test/java/...                            ← Klasy testów JUnit
-├── jenkins/build.jenkinsfile                    ← Potok CI/CD
+├── jenkins/
+│   ├── build.jenkinsfile                        ← Potok CI/CD (Docker)
+│   └── build-legacy-jar.jenkinsfile             ← Poprzedni potok wdrażający JAR na agenta
+├── .github/workflows/ci.yml                     ← Bramka jakości (GitHub Actions)
+├── scripts/
+│   ├── stack.sh                                 ← build / test / sonar / up / down
+│   └── stack.ps1                                ← to samo, dla Windowsa
 ├── tool/
 │   ├── backend_rules.md                         ← Standardy kodowania backendu
 │   └── information/                             ← Materiały prezentacyjne
-├── docker-compose.yml                           ← Serwis PostgreSQL 15
+├── Dockerfile                                   ← Wieloetapowy: deps/test/sonar/build/runtime
+├── .dockerignore
+├── docker-compose.yml                           ← PostgreSQL 15 + backend, sieć loyaltyclub-net
+├── .env.example                                 ← Wzorzec ustawień wdrożenia
 └── pom.xml
 ```
 

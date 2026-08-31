@@ -69,6 +69,11 @@ public class SecurityConfig {
 
                     auth.requestMatchers(
                                     "/error",
+                                    // Sonda zdrowia dla orkiestratora kontenerow; odpytywana
+                                    // z wnetrza kontenera, bez poswiadczen. Ujawnia wylacznie
+                                    // status UP/DOWN (management.endpoint.health.show-details=never).
+                                    "/actuator/health",
+                                    "/actuator/health/**",
                                     "/api/admin/auth/login",
                                     "/api/store/auth/login",
                                     "/api/ecom/auth/login"

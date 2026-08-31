@@ -1,0 +1,29 @@
+# Kontekst budowania ma zawierac wylacznie to, z czego powstaje JAR.
+# Wszystko ponizej albo jest odtwarzane w obrazie, albo nie ma z nim zwiazku.
+
+.git
+.gitignore
+.idea
+
+# Wyniki lokalnego budowania - w obrazie powstaja od nowa.
+target/
+.m2/
+
+# Lokalne repozytorium Mavena wskazywane przez .mvn-settings.xml; w obrazie
+# uzywamy domyslnego ~/.m2 z montowanym cache BuildKita.
+.mvn-settings.xml
+
+# Materialy pomocnicze, dokumentacja, prezentacje.
+README.md
+docs/
+tool/
+files/
+jenkins/
+scripts/
+
+# Konfiguracja uruchomieniowa - podawana przez zmienne srodowiskowe.
+docker-compose*.yml
+Dockerfile
+.dockerignore
+.env
+.env.*

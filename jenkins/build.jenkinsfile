@@ -1,13 +1,30 @@
+// Potok CI/CD warstwy serwerowej LoyaltyClub - w calosci na Dockerze.
+//
+// Na agencie potrzebny jest wylacznie dzialajacy Docker (z BuildKit). JDK,
+// Maven ani lokalne repozytorium ~/.m2 nie sa wymagane - kazdy krok wykonuje
+// sie w kontenerze zbudowanym z Dockerfile w korzeniu repozytorium.
+//
+// Wynikiem jest dzialajacy kontener "loyalty-backend" w sieci
+// "loyaltyclub-net", do ktorej podlacza sie wdrozenie frontendu.
+
 pipeline {
     agent any
 
+    options {
+        timestamps()
+        // Rownolegle przebiegi walczylyby o te same nazwy kontenerow i port.
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+    }
+
     environment {
-        JAVA_HOME = '/usr/lib/jvm/java-25-openjdk-amd64'
-        PATH = "${JAVA_HOME}/bin:${env.PATH}"
-        TARGET_DIR = '/home/wojciech/loyalty-club-builds'
-        ARCHIVE_DIR = "${TARGET_DIR}/archive"
-        // Ograniczamy RAM dla Javy, aby system nie "wisiał" przy 7GB RAMu
-        JAVA_OPTS = "-Xms512M -Xmx1G -XX:+UseG1GC"
+        BACKEND_IMAGE = 'loyaltyclub/backend'
+        // Numer budowania jako znacznik obrazu daje mozliwosc wskazania
+        // konkretnej wersji przy wycofywaniu zmian.
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
+        // Wymuszamy BuildKit - bez niego nie dzialaja cele wieloetapowe
+        // z --secret i --output uzywane nizej.
+        DOCKER_BUILDKIT = '1'
     }
 
     stages {
@@ -19,97 +36,87 @@ pipeline {
 
         stage('Testy jednostkowe') {
             steps {
-                echo '==== Uruchamiam testy jednostkowe backendu ===='
-                sh 'mvn test'
+                echo '==== Testy jednostkowe w kontenerze ===='
+                // Cel test-reports wystawia surefire i JaCoCo do katalogu na
+                // dysku agenta; pliki naleza do uzytkownika Jenkinsa, bo
+                // zapisuje je BuildKit, a nie proces roota w kontenerze.
+                sh 'bash ./scripts/stack.sh test'
             }
             post {
                 always {
-                    junit 'target/surefire-reports/*.xml'
+                    junit 'target/docker-reports/surefire-reports/*.xml'
+                    publishHTML(target: [
+                        reportDir            : 'target/docker-reports/jacoco',
+                        reportFiles          : 'index.html',
+                        reportName           : 'Pokrycie kodu (JaCoCo)',
+                        keepAll              : true,
+                        alwaysLinkToLastBuild: true,
+                        allowMissing         : true
+                    ])
                 }
             }
         }
 
         stage('Analiza SonarQube') {
             steps {
-                echo '==== Uruchamiam analizę SonarQube ===='
+                echo '==== Analiza SonarQube ===='
                 withCredentials([string(credentialsId: 'loyalty-club', variable: 'SONAR_TOKEN')]) {
-                    sh 'mvn sonar:sonar -Dsonar.login=${SONAR_TOKEN}'
+                    // Token trafia do budowania jako sekret BuildKita
+                    // (--secret), wiec nie zostaje w warstwach obrazu.
+                    sh 'bash ./scripts/stack.sh sonar'
                 }
             }
         }
 
-        stage('Budowanie Backendu (Maven)') {
+        stage('Budowanie obrazu') {
             steps {
-                echo '==== Rozpoczynam budowanie JAR-a backendu ===='
-                sh 'mvn clean package -DskipTests'
+                echo '==== Budowanie obrazu wykonawczego ===='
+                sh '''
+                    docker build \
+                        --target runtime \
+                        -t "${BACKEND_IMAGE}:${IMAGE_TAG}" \
+                        -t "${BACKEND_IMAGE}:latest" \
+                        .
+                '''
             }
         }
 
-        stage('Zatrzymanie i Archiwizacja') {
+        stage('Wdrozenie') {
             steps {
-                echo '==== Sprzątanie starej wersji ===='
-                sh """
-                    # Precyzyjne zabijanie tylko procesów java uruchamiających ten konkretny plik
-                    # Używamy || true, aby Jenkins nie przerwał buildu, gdy proces nie istnieje
-                    echo "Zatrzymywanie starej instancji loyaltyClub..."
-                    pkill -9 -f "java.*loyaltyClub.jar" || echo "Nie znaleziono działającej aplikacji."
-
-                    # Chwila na zwolnienie portów przez system
-                    sleep 5
-
-                    # Tworzenie folderu archiwum
-                    mkdir -p "${ARCHIVE_DIR}"
-
-                    # Archiwizacja starego pliku przed nadpisaniem
-                    if [ -f "${TARGET_DIR}/loyaltyClub.jar" ]; then
-                        TIMESTAMP=\$(date +"%Y%m%d_%H%M%S")
-                        mv "${TARGET_DIR}/loyaltyClub.jar" "${ARCHIVE_DIR}/loyaltyClub_\${TIMESTAMP}.jar"
-                        echo "Stary plik zarchiwizowany jako: loyaltyClub_\${TIMESTAMP}.jar"
-                    fi
-                """
+                echo '==== Podmiana dzialajacej wersji ===='
+                // --no-build: obraz powstal w poprzednim etapie i jest juz
+                // oznaczony numerem budowania. compose ma go tylko uruchomic.
+                sh '''
+                    IMAGE_TAG="${IMAGE_TAG}" docker compose up -d --no-build
+                '''
             }
         }
 
-        stage('Kopiowanie (Deploy)') {
+        stage('Test dymny') {
             steps {
-                echo '==== Kopiowanie nowego artefaktu ===='
-                // Szukamy pliku jar w target i kopiujemy do docelowej lokalizacji
-                sh "cp target/*.jar ${TARGET_DIR}/loyaltyClub.jar"
-            }
-        }
-
-        stage('Uruchomienie Aplikacji') {
-            steps {
-                echo '==== Startowanie nowej wersji w tle ===='
-                sh """
-                    # Kluczowe dla Jenkinsa: nie zabijaj procesów potomnych po zakończeniu joba
-                    export JENKINS_NODE_COOKIE=dontKillMe
-
-                    # Uruchomienie z limitami pamięci i przekierowaniem logów
-                    nohup java ${env.JAVA_OPTS} -jar "${TARGET_DIR}/loyaltyClub.jar" > "${TARGET_DIR}/application.log" 2>&1 &
-
-                    echo "Aplikacja startuje... Czekam na weryfikację (15s)..."
-                    sleep 15
-
-                    # Sprawdzenie czy proces faktycznie żyje
-                    if pgrep -f "java.*loyaltyClub.jar" > /dev/null; then
-                        echo "SUKCES: Aplikacja działa poprawnie."
-                        pgrep -f "java.*loyaltyClub.jar" | xargs echo "PID procesu:"
-                    else
-                        echo "BŁĄD: Aplikacja padła zaraz po starcie! Sprawdź logi w ${TARGET_DIR}/application.log"
-                        exit 1
-                    fi
-                """
+                echo '==== Weryfikacja dzialajacej instancji ===='
+                // Skrypt czeka na stan healthy kontenera i odpytuje sonde
+                // z wnetrza sieci kontenerow.
+                sh 'bash ./scripts/stack.sh smoke'
             }
         }
     }
 
     post {
         success {
-            echo "==== WDROŻENIE ZAKOŃCZONE POMYŚLNIE ===="
+            echo "==== WDROZENIE ZAKONCZONE POMYSLNIE (${BACKEND_IMAGE}:${IMAGE_TAG}) ===="
         }
         failure {
-            echo "==== WDROŻENIE NIEUDANE - Sprawdź konsolę Jenkinsa i logi aplikacji ===="
+            echo '==== WDROZENIE NIEUDANE ===='
+            // Logi kontenera sa najszybsza droga do przyczyny, gdy potok
+            // przewrocil sie na tescie dymnym.
+            sh 'docker compose logs --tail 200 backend || true'
+            echo "Wycofanie: IMAGE_TAG=<poprzedni numer> docker compose up -d --no-build"
+        }
+        always {
+            // Obrazy z poprzednich przebiegow zapelnilyby dysk agenta.
+            // Warstwy wspoldzielone z biezacym obrazem zostaja nietkniete.
+            sh 'docker image prune -f --filter "until=168h" || true'
         }
     }
 }

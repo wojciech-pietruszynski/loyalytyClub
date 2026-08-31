@@ -7,3 +7,6 @@
 
 # Ustawienia IDE
 /.idea/
+
+# Konfiguracja wdrozenia kontenerowego (sekrety). Wzorzec: .env.example
+/.env
