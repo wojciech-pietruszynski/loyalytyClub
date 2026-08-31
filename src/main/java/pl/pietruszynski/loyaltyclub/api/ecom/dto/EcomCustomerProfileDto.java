@@ -9,6 +9,9 @@ public record EcomCustomerProfileDto(
         String phoneNumber,
         String country,
         Integer loyaltyPoints,
+        /** Dorobek punktowy -- podstawa poziomu lojalnosciowego. */
+        Integer lifetimePoints,
         String loyaltyTierCode,
-        String referralCode
+        String referralCode,
+        String status
 ) {}

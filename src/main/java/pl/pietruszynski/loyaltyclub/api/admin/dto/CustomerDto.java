@@ -6,6 +6,8 @@ import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -30,14 +32,24 @@ public class CustomerDto {
     @PositiveOrZero(message = "Loyalty points cannot be negative")
     private Integer loyaltyPoints;
 
+    /**
+     * Dorobek punktowy uczestnika (tylko do odczytu). Nie maleje przy wymianie
+     * punktow na kupon ani przy wygasnieciu -- to z niego wynika poziom lojalnosciowy.
+     */
+    private Integer lifetimePoints;
+
+    /** Populated on read responses: ACTIVE / INACTIVE / ANONYMIZED. */
+    private String status;
+
+    /** Populated on read responses. */
+    private LocalDateTime createdAt;
+
     /** Optional: existing customer's number who referred this registration (create only). */
     private String referrerCustomerNumber;
 
     /** Populated on read responses. */
     private String referralCode;
 
-    /** Populated on read responses — derived from tier definitions and point balance. */
+    /** Populated on read responses — derived from tier definitions and lifetime points. */
     private String loyaltyTierCode;
 }
-
-

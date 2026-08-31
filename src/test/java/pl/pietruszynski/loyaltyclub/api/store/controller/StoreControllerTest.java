@@ -18,6 +18,7 @@ import pl.pietruszynski.loyaltyclub.api.ecom.security.EcomUserDetailsService;
 import pl.pietruszynski.loyaltyclub.api.store.dto.*;
 import pl.pietruszynski.loyaltyclub.api.store.security.StoreUserDetailsService;
 import pl.pietruszynski.loyaltyclub.api.store.service.StoreTransactionService;
+import pl.pietruszynski.loyaltyclub.security.TokenRevocationService;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -41,6 +42,7 @@ class StoreControllerTest {
     @MockBean AdminUserDetailsService adminUserDetailsService;
     @MockBean StoreUserDetailsService storeUserDetailsService;
     @MockBean EcomUserDetailsService ecomUserDetailsService;
+    @MockBean TokenRevocationService tokenRevocationService;
 
     @Test
     void info_shouldReturnStatusReady() throws Exception {

@@ -49,7 +49,6 @@ class AdminUserDetailsServiceTest {
         TechnicalUser tech = TechnicalUser.builder()
                 .username("techpl")
                 .password("encoded")
-                .passwordPreview("plain")
                 .country("PL")
                 .enabled(true)
                 .build();

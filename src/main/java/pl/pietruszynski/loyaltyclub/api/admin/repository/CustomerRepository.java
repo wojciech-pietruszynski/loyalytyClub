@@ -1,6 +1,8 @@
 package pl.pietruszynski.loyaltyclub.api.admin.repository;
 
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -26,11 +28,27 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     long countByCountry(String country);
 
-    @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(c.loyaltyPoints), 0) FROM Customer c")
+    List<Customer> findAllByReferredByIdOrderByIdAsc(Long referrerCustomerId);
+
+    /**
+     * Stronicowane wyszukiwanie kartoteki. Puste {@code query} zwraca cala
+     * kartoteke w zakresie kraju; {@code country} rowne {@code null} znosi
+     * ograniczenie krajowe (rola ADMIN).
+     */
+    @Query("""
+            SELECT c FROM Customer c
+            WHERE (:country IS NULL OR c.country = :country)
+              AND (:query IS NULL
+                   OR LOWER(c.lastName) LIKE :query
+                   OR LOWER(c.firstName) LIKE :query
+                   OR LOWER(c.email) LIKE :query
+                   OR LOWER(c.customerNumber) LIKE :query)
+            """)
+    Page<Customer> search(String country, String query, Pageable pageable);
+
+    @Query("SELECT COALESCE(SUM(c.loyaltyPoints), 0) FROM Customer c")
     long sumLoyaltyPoints();
 
-    @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(c.loyaltyPoints), 0) FROM Customer c WHERE c.country = :country")
+    @Query("SELECT COALESCE(SUM(c.loyaltyPoints), 0) FROM Customer c WHERE c.country = :country")
     long sumLoyaltyPointsByCountry(String country);
 }
-
-

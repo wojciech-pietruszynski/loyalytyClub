@@ -9,8 +9,11 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Date;
-import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class JwtService {
@@ -25,17 +28,24 @@ public class JwtService {
         return generateToken(username, null);
     }
 
+    /**
+     * Kazdy token dostaje wlasny identyfikator {@code jti} oraz znacznik wydania
+     * {@code iat}. Bez nich token bezstanowy jest nieuniewaznialny: {@code jti}
+     * pozwala wycofac pojedyncza sesje przy wylogowaniu, a {@code iat} -- wszystkie
+     * sesje konta naraz przy zmianie hasla.
+     */
     public String generateToken(String username, String role) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + jwtExpirationMs);
         io.jsonwebtoken.JwtBuilder builder = Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .subject(username)
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(getSigningKey());
 
         if (role != null && !role.isBlank()) {
-            builder.claims(Map.of("role", role));
+            builder.claim("role", role);
         }
 
         return builder.compact();
@@ -45,8 +55,20 @@ public class JwtService {
         return extractClaims(token).getSubject();
     }
 
+    public String extractTokenId(String token) {
+        return extractClaims(token).getId();
+    }
+
     public long extractExpirationEpochMillis(String token) {
         return extractClaims(token).getExpiration().getTime();
+    }
+
+    public LocalDateTime extractExpiration(String token) {
+        return toLocalDateTime(extractClaims(token).getExpiration());
+    }
+
+    public LocalDateTime extractIssuedAt(String token) {
+        return toLocalDateTime(extractClaims(token).getIssuedAt());
     }
 
     public String extractRole(String token) {
@@ -75,10 +97,12 @@ public class JwtService {
                 .getPayload();
     }
 
+    private LocalDateTime toLocalDateTime(Date date) {
+        return date == null ? null : LocalDateTime.ofInstant(Instant.ofEpochMilli(date.getTime()), ZoneId.systemDefault());
+    }
+
     private SecretKey getSigningKey() {
         byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
         return Keys.hmacShaKeyFor(keyBytes);
     }
 }
-
-

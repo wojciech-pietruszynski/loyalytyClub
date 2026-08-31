@@ -19,6 +19,8 @@ import pl.pietruszynski.loyaltyclub.api.store.repository.StorePointsPromotionRep
 import pl.pietruszynski.loyaltyclub.exception.BusinessException;
 import pl.pietruszynski.loyaltyclub.exception.ResourceNotFoundException;
 import pl.pietruszynski.loyaltyclub.api.store.repository.HierarchyPromotionRepository;
+import pl.pietruszynski.loyaltyclub.idempotency.IdempotencyService;
+import pl.pietruszynski.loyaltyclub.idempotency.IdempotencyService.IdempotentResult;
 import pl.pietruszynski.loyaltyclub.util.CouponCodeGenerator;
 import pl.pietruszynski.loyaltyclub.util.ReferralCodeGenerator;
 
@@ -45,6 +47,9 @@ class LoyaltyServiceTest {
     @Mock private CustomerCouponRepository customerCouponRepository;
     @Mock private StorePointsPromotionRepository storePointsPromotionRepository;
     @Mock private HierarchyPromotionRepository hierarchyPromotionRepository;
+    @Mock private CustomerPointsService customerPointsService;
+    @Mock private ReferralRewardService referralRewardService;
+    @Mock private IdempotencyService idempotencyService;
 
     @InjectMocks
     private LoyaltyService loyaltyService;
@@ -55,6 +60,12 @@ class LoyaltyServiceTest {
         // Kod polecenia nadawany jest tylko przy tworzeniu klienta — pozostale testy tych stubow nie uzywaja.
         lenient().when(referralCodeGenerator.generate(10)).thenReturn("REFCODE12345");
         lenient().when(customerRepository.existsByReferralCode(anyString())).thenReturn(false);
+        // Swiezy klucz idempotencji: warstwa przepuszcza operacje do wykonania.
+        lenient().when(idempotencyService.execute(anyString(), anyString(), anyString(), any(), any()))
+                .thenAnswer(inv -> {
+                    java.util.function.Supplier<IdempotentResult<?>> action = inv.getArgument(3);
+                    return action.get().value();
+                });
     }
 
     // -----------------------------------------------------------------------
@@ -260,8 +271,9 @@ class LoyaltyServiceTest {
         CouponIssueRequest request = new CouponIssueRequest(1L, 1L, CouponReason.POINTS_EXCHANGE);
         CustomerCoupon result = loyaltyService.issueCoupon(request);
 
-        assertThat(customer.getLoyaltyPoints()).isEqualTo(100);
-        verify(transactionRepository).save(any(Transaction.class));
+        verify(transactionRepository).save(argThat(t -> t.getPoints() == -100
+                && t.getType() == TransactionType.POINTS_REDEMPTION));
+        verify(customerPointsService).refresh(customer);
         assertThat(result.getStatus()).isEqualTo(CouponStatus.ACTIVE);
     }
 
@@ -308,19 +320,58 @@ class LoyaltyServiceTest {
     // -----------------------------------------------------------------------
 
     @Test
-    void addPoints_shouldIncrementAndSave() {
+    void addPoints_shouldRecordAdjustmentAndRecalculateBalances() {
         Customer customer = customer("a@pl.com", "PL");
         customer.setId(1L);
         customer.setLoyaltyPoints(100);
 
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
-        when(customerRepository.save(any())).thenReturn(customer);
+        when(transactionRepository.save(any())).thenAnswer(inv -> {
+            Transaction t = inv.getArgument(0);
+            t.setId(7L);
+            return t;
+        });
 
-        loyaltyService.addPoints(1L, 50, "bonus");
+        Transaction result = loyaltyService.addPoints(1L, 50, "bonus", "key-1");
 
-        assertThat(customer.getLoyaltyPoints()).isEqualTo(150);
-        verify(transactionRepository).save(any(Transaction.class));
-        verify(customerRepository).save(customer);
+        assertThat(result.getPoints()).isEqualTo(50);
+        assertThat(result.getType()).isEqualTo(TransactionType.MANUAL_ADJUSTMENT);
+        // Saldo powstaje z przeliczenia historii, nie z modyfikacji przyrostowej.
+        verify(customerPointsService).refresh(customer);
+    }
+
+    /**
+     * Korekta reczna nie ma numeru dokumentu kasowego, wiec przed podwojnym
+     * wykonaniem chroni ja wylacznie klucz idempotencji.
+     */
+    @Test
+    void addPoints_shouldRouteThroughIdempotencyLayer() {
+        Customer customer = customer("a@pl.com", "PL");
+        customer.setId(1L);
+
+        when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
+        when(transactionRepository.save(any())).thenAnswer(inv -> {
+            Transaction t = inv.getArgument(0);
+            t.setId(7L);
+            return t;
+        });
+
+        loyaltyService.addPoints(1L, 50, "bonus", "key-1");
+
+        verify(idempotencyService).execute(eq("ADD_POINTS"), eq("key-1"), eq("1|50|bonus"), any(), any());
+    }
+
+    @Test
+    void addPoints_inactiveCustomer_shouldThrow() {
+        Customer customer = customer("a@pl.com", "PL");
+        customer.setId(1L);
+        customer.setStatus(CustomerStatus.INACTIVE);
+
+        when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
+
+        assertThatThrownBy(() -> loyaltyService.addPoints(1L, 50, "bonus", "key-1"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("cannot take part in point operations");
     }
 
     // -----------------------------------------------------------------------

@@ -5,13 +5,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.TechnicalUserCreateRequest;
 import pl.pietruszynski.loyaltyclub.api.admin.model.TechnicalUser;
 import pl.pietruszynski.loyaltyclub.api.admin.repository.TechnicalUserRepository;
+import pl.pietruszynski.loyaltyclub.api.admin.service.TechnicalUserService.TechnicalUserWithPassword;
 import pl.pietruszynski.loyaltyclub.exception.ResourceNotFoundException;
+import pl.pietruszynski.loyaltyclub.security.TokenRevocationService;
+import pl.pietruszynski.loyaltyclub.util.PasswordGenerator;
 
 import java.util.List;
 import java.util.Optional;
@@ -25,6 +29,10 @@ class TechnicalUserServiceTest {
 
     @Mock private TechnicalUserRepository technicalUserRepository;
     @Mock private PasswordEncoder passwordEncoder;
+    @Mock private TokenRevocationService tokenRevocationService;
+
+    @Spy
+    private PasswordGenerator passwordGenerator = new PasswordGenerator();
 
     @InjectMocks
     private TechnicalUserService technicalUserService;
@@ -55,35 +63,70 @@ class TechnicalUserServiceTest {
 
     @Test
     void createTechnicalUser_valid_shouldEncodePasswordAndSave() {
-        TechnicalUserCreateRequest req = new TechnicalUserCreateRequest("techpl", "secret", "PL", true);
+        TechnicalUserCreateRequest req = new TechnicalUserCreateRequest("techpl", "Secret-Passw0rd", "PL", true);
         when(technicalUserRepository.existsByUsername("techpl")).thenReturn(false);
-        when(passwordEncoder.encode("secret")).thenReturn("encoded-secret");
+        when(passwordEncoder.encode("Secret-Passw0rd")).thenReturn("encoded-secret");
         when(technicalUserRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        TechnicalUser result = technicalUserService.createTechnicalUser(req);
+        TechnicalUserWithPassword result = technicalUserService.createTechnicalUser(req);
 
-        assertThat(result.getUsername()).isEqualTo("techpl");
-        assertThat(result.getPassword()).isEqualTo("encoded-secret");
-        assertThat(result.getPasswordPreview()).isEqualTo("secret");
-        assertThat(result.getCountry()).isEqualTo("PL");
-        assertThat(result.isEnabled()).isTrue();
+        assertThat(result.user().getUsername()).isEqualTo("techpl");
+        assertThat(result.user().getPassword()).isEqualTo("encoded-secret");
+        assertThat(result.user().getCountry()).isEqualTo("PL");
+        assertThat(result.user().isEnabled()).isTrue();
+        assertThat(result.oneTimePassword()).isEqualTo("Secret-Passw0rd");
+    }
+
+    /** Haslo nie jest juz nigdzie utrwalane -- encja zna wylacznie skrot. */
+    @Test
+    void createTechnicalUser_shouldNotStorePlainTextPassword() {
+        TechnicalUserCreateRequest req = new TechnicalUserCreateRequest("techpl", "Secret-Passw0rd", "PL", true);
+        when(technicalUserRepository.existsByUsername("techpl")).thenReturn(false);
+        when(passwordEncoder.encode(anyString())).thenReturn("encoded-secret");
+        when(technicalUserRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        TechnicalUser saved = technicalUserService.createTechnicalUser(req).user();
+
+        assertThat(saved.getPassword()).doesNotContain("Secret-Passw0rd");
+        assertThat(saved.getPasswordChangedAt()).isNotNull();
+    }
+
+    @Test
+    void createTechnicalUser_withoutPassword_shouldGenerateOneTimePassword() {
+        TechnicalUserCreateRequest req = new TechnicalUserCreateRequest("techpl", null, "PL", true);
+        when(technicalUserRepository.existsByUsername("techpl")).thenReturn(false);
+        when(passwordEncoder.encode(anyString())).thenReturn("encoded");
+        when(technicalUserRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        TechnicalUserWithPassword result = technicalUserService.createTechnicalUser(req);
+
+        assertThat(result.oneTimePassword()).isNotBlank().hasSizeGreaterThanOrEqualTo(12);
+    }
+
+    @Test
+    void createTechnicalUser_weakPassword_shouldThrow() {
+        TechnicalUserCreateRequest req = new TechnicalUserCreateRequest("techpl", "short", "PL", true);
+
+        assertThatThrownBy(() -> technicalUserService.createTechnicalUser(req))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Password must have between");
     }
 
     @Test
     void createTechnicalUser_defaultEnabled_whenEnabledIsNull() {
-        TechnicalUserCreateRequest req = new TechnicalUserCreateRequest("techpl", "secret", "PL", null);
+        TechnicalUserCreateRequest req = new TechnicalUserCreateRequest("techpl", "Secret-Passw0rd", "PL", null);
         when(technicalUserRepository.existsByUsername("techpl")).thenReturn(false);
         when(passwordEncoder.encode(anyString())).thenReturn("enc");
         when(technicalUserRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        TechnicalUser result = technicalUserService.createTechnicalUser(req);
+        TechnicalUserWithPassword result = technicalUserService.createTechnicalUser(req);
 
-        assertThat(result.isEnabled()).isTrue();
+        assertThat(result.user().isEnabled()).isTrue();
     }
 
     @Test
     void createTechnicalUser_disallowedCountry_shouldThrow() {
-        TechnicalUserCreateRequest req = new TechnicalUserCreateRequest("techfr", "secret", "FR", true);
+        TechnicalUserCreateRequest req = new TechnicalUserCreateRequest("techfr", "Secret-Passw0rd", "FR", true);
 
         assertThatThrownBy(() -> technicalUserService.createTechnicalUser(req))
                 .isInstanceOf(RuntimeException.class)
@@ -92,7 +135,7 @@ class TechnicalUserServiceTest {
 
     @Test
     void createTechnicalUser_duplicateUsername_shouldThrow() {
-        TechnicalUserCreateRequest req = new TechnicalUserCreateRequest("existing", "secret", "PL", true);
+        TechnicalUserCreateRequest req = new TechnicalUserCreateRequest("existing", "Secret-Passw0rd", "PL", true);
         when(technicalUserRepository.existsByUsername("existing")).thenReturn(true);
 
         assertThatThrownBy(() -> technicalUserService.createTechnicalUser(req))
@@ -102,16 +145,7 @@ class TechnicalUserServiceTest {
 
     @Test
     void createTechnicalUser_blankUsername_shouldThrow() {
-        TechnicalUserCreateRequest req = new TechnicalUserCreateRequest("", "secret", "PL", true);
-
-        assertThatThrownBy(() -> technicalUserService.createTechnicalUser(req))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("required");
-    }
-
-    @Test
-    void createTechnicalUser_blankPassword_shouldThrow() {
-        TechnicalUserCreateRequest req = new TechnicalUserCreateRequest("techpl", "", "PL", true);
+        TechnicalUserCreateRequest req = new TechnicalUserCreateRequest("", "Secret-Passw0rd", "PL", true);
 
         assertThatThrownBy(() -> technicalUserService.createTechnicalUser(req))
                 .isInstanceOf(RuntimeException.class)
@@ -120,14 +154,14 @@ class TechnicalUserServiceTest {
 
     @Test
     void createTechnicalUser_countryNormalized_shouldSaveUppercased() {
-        TechnicalUserCreateRequest req = new TechnicalUserCreateRequest("techpl", "secret", "pl", true);
+        TechnicalUserCreateRequest req = new TechnicalUserCreateRequest("techpl", "Secret-Passw0rd", "pl", true);
         when(technicalUserRepository.existsByUsername("techpl")).thenReturn(false);
         when(passwordEncoder.encode(anyString())).thenReturn("enc");
         when(technicalUserRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        TechnicalUser result = technicalUserService.createTechnicalUser(req);
+        TechnicalUserWithPassword result = technicalUserService.createTechnicalUser(req);
 
-        assertThat(result.getCountry()).isEqualTo("PL");
+        assertThat(result.user().getCountry()).isEqualTo("PL");
     }
 
     // -----------------------------------------------------------------------
@@ -146,6 +180,8 @@ class TechnicalUserServiceTest {
         TechnicalUser result = technicalUserService.setTechnicalUserEnabled(1L, false);
 
         assertThat(result.isEnabled()).isFalse();
+        // Dezaktywacja bez wycofania tokenow bylaby pozorna.
+        verify(tokenRevocationService).revokeAllTokensFor("tech", "ACCOUNT_DISABLED");
     }
 
     @Test
@@ -166,13 +202,30 @@ class TechnicalUserServiceTest {
         user.setId(1L);
 
         when(technicalUserRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(passwordEncoder.encode("newpass")).thenReturn("encoded-newpass");
+        when(passwordEncoder.encode("New-Passw0rd!")).thenReturn("encoded-newpass");
         when(technicalUserRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        TechnicalUser result = technicalUserService.updateTechnicalUserPassword(1L, "newpass");
+        TechnicalUser result = technicalUserService.updateTechnicalUserPassword(1L, "New-Passw0rd!");
 
         assertThat(result.getPassword()).isEqualTo("encoded-newpass");
-        assertThat(result.getPasswordPreview()).isEqualTo("newpass");
+        verify(tokenRevocationService).revokeAllTokensFor("tech", "PASSWORD_CHANGED");
+    }
+
+    /** Reset zwraca nowe haslo raz -- zastepuje odczyt hasla z bazy. */
+    @Test
+    void resetTechnicalUserPassword_shouldReturnFreshOneTimePassword() {
+        TechnicalUser user = techUser("tech", "PL");
+        user.setId(1L);
+
+        when(technicalUserRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.encode(anyString())).thenReturn("encoded-generated");
+        when(technicalUserRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        TechnicalUserWithPassword result = technicalUserService.resetTechnicalUserPassword(1L);
+
+        assertThat(result.oneTimePassword()).isNotBlank().hasSizeGreaterThanOrEqualTo(12);
+        assertThat(result.user().getPassword()).isEqualTo("encoded-generated");
+        verify(tokenRevocationService).revokeAllTokensFor("tech", "PASSWORD_CHANGED");
     }
 
     @Test
@@ -186,7 +239,7 @@ class TechnicalUserServiceTest {
     void updateTechnicalUserPassword_missing_shouldThrowResourceNotFound() {
         when(technicalUserRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> technicalUserService.updateTechnicalUserPassword(99L, "pass"))
+        assertThatThrownBy(() -> technicalUserService.updateTechnicalUserPassword(99L, "New-Passw0rd!"))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
@@ -234,7 +287,6 @@ class TechnicalUserServiceTest {
         return TechnicalUser.builder()
                 .username(username)
                 .password("encoded")
-                .passwordPreview("plain")
                 .country(country)
                 .enabled(true)
                 .build();

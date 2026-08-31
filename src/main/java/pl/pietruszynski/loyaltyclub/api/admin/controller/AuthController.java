@@ -2,39 +2,44 @@ package pl.pietruszynski.loyaltyclub.api.admin.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import pl.pietruszynski.loyaltyclub.api.admin.dto.ChangePasswordRequest;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.LoginRequest;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.LoginResponse;
+import pl.pietruszynski.loyaltyclub.api.admin.audit.Auditable;
 import pl.pietruszynski.loyaltyclub.api.admin.repository.TechnicalUserRepository;
-import pl.pietruszynski.loyaltyclub.api.admin.security.JwtService;
+import pl.pietruszynski.loyaltyclub.api.admin.service.AccountService;
+import pl.pietruszynski.loyaltyclub.security.AuthenticationTokenService;
+import pl.pietruszynski.loyaltyclub.security.AuthenticationTokenService.IssuedToken;
+
+import java.util.Collection;
 
 @RestController
 @RequestMapping("/api/admin/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
-    private final AuthenticationManager authenticationManager;
+    private static final String ROLE_TECHNICAL = "ROLE_TECHNICAL";
+
+    private final AuthenticationTokenService authenticationTokenService;
+    private final AccountService accountService;
     private final TechnicalUserRepository technicalUserRepository;
-    private final JwtService jwtService;
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.username(), request.password())
+        // Panel obsluguje dwa rodzaje kont; rola wynika z uprawnien konta, ktore
+        // przeszlo uwierzytelnienie, a nie z tego, do ktorego punktu przyszlo zadanie.
+        IssuedToken issued = authenticationTokenService.loginAsAny(
+                request.username(),
+                request.password(),
+                java.util.Map.of("ROLE_ADMIN", "ADMIN", ROLE_TECHNICAL, "TECHNICAL")
         );
-
-        UserDetails principal = (UserDetails) authentication.getPrincipal();
-        String role = resolveRole(principal.getAuthorities());
-        String token = jwtService.generateToken(principal.getUsername(), role);
-        long expiresAt = jwtService.extractExpirationEpochMillis(token);
-
-        return ResponseEntity.ok(buildLoginResponse(token, expiresAt, principal.getUsername(), principal.getAuthorities()));
+        return ResponseEntity.ok(buildLoginResponse(issued));
     }
 
     @PostMapping("/refresh")
@@ -42,33 +47,44 @@ public class AuthController {
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(401).build();
         }
-        String username = authentication.getName();
         UserDetails principal = (UserDetails) authentication.getPrincipal();
         String role = resolveRole(principal.getAuthorities());
-        String token = jwtService.generateToken(username, role);
-        long expiresAt = jwtService.extractExpirationEpochMillis(token);
-        return ResponseEntity.ok(buildLoginResponse(token, expiresAt, username, principal.getAuthorities()));
+        return ResponseEntity.ok(buildLoginResponse(authenticationTokenService.refresh(authentication, role)));
     }
 
-    private LoginResponse buildLoginResponse(String token, long expiresAt, String username, java.util.Collection<? extends GrantedAuthority> authorities) {
-        boolean technical = authorities.stream().anyMatch(a -> "ROLE_TECHNICAL".equals(a.getAuthority()));
-        String country = technical
-                ? technicalUserRepository.findByUsername(username).map(u -> u.getCountry()).orElse(null)
+    /** Wycofuje okazany token; kolejne zadanie z nim otrzyma 401. */
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader) {
+        authenticationTokenService.logout(authorizationHeader);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Zmiana wlasnego hasla; uniewaznia wszystkie sesje konta, wlacznie z biezaca. */
+    @PostMapping("/change-password")
+    @Auditable(value = "CHANGE_OWN_PASSWORD", resourceType = "ACCOUNT")
+    public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request,
+                                               Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).build();
+        }
+        accountService.changeOwnPassword(authentication.getName(), request.currentPassword(), request.newPassword());
+        return ResponseEntity.noContent().build();
+    }
+
+    private LoginResponse buildLoginResponse(IssuedToken issued) {
+        String country = "TECHNICAL".equals(issued.role())
+                ? technicalUserRepository.findByUsername(issued.username()).map(user -> user.getCountry()).orElse(null)
                 : null;
 
         return LoginResponse.builder()
-                .token(token)
-                .expiresAt(expiresAt)
-                .role(technical ? "TECHNICAL" : "ADMIN")
+                .token(issued.token())
+                .expiresAt(issued.expiresAt())
+                .role(issued.role())
                 .country(country)
                 .build();
     }
 
-    private String resolveRole(java.util.Collection<? extends GrantedAuthority> authorities) {
-        return authorities.stream().anyMatch(a -> "ROLE_TECHNICAL".equals(a.getAuthority()))
-                ? "TECHNICAL"
-                : "ADMIN";
+    private String resolveRole(Collection<? extends GrantedAuthority> authorities) {
+        return authenticationTokenService.hasAuthority(authorities, ROLE_TECHNICAL) ? "TECHNICAL" : "ADMIN";
     }
 }
-
-

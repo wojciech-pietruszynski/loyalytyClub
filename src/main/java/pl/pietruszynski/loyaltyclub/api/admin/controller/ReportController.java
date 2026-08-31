@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import pl.pietruszynski.loyaltyclub.api.admin.dto.ExpiringPointsDto;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.ReportsSummaryDto;
 import pl.pietruszynski.loyaltyclub.api.admin.service.ReportService;
 import pl.pietruszynski.loyaltyclub.api.admin.service.TechnicalUserService;
@@ -20,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/reports")
@@ -36,6 +38,19 @@ public class ReportController {
     @GetMapping("/summary")
     public ReportsSummaryDto getSummary(Authentication authentication) {
         return reportService.getSummary(getCountryScope(authentication));
+    }
+
+    /**
+     * Punkty, ktore wygasna w zadanym oknie. Program nie mial dotad zadnego widoku
+     * na zblizajace sie wygasniecia -- ani dla operatora, ani dla uczestnika.
+     *
+     * @param days horyzont w dniach; domyslnie 30
+     */
+    @GetMapping("/expiring-points")
+    public List<ExpiringPointsDto> getExpiringPoints(
+            @RequestParam(defaultValue = "30") int days,
+            Authentication authentication) {
+        return reportService.getExpiringPoints(days, getCountryScope(authentication));
     }
 
     @GetMapping("/export/customers")

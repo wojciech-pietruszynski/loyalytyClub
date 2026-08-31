@@ -3,6 +3,7 @@ package pl.pietruszynski.loyaltyclub.api.admin.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -38,9 +39,31 @@ public class Customer {
     @Column(nullable = false, length = 3)
     private String country;
 
+    /** Biezace saldo -- punkty dostepne do wykorzystania tu i teraz. */
     @Column(nullable = false)
     @Builder.Default
     private Integer loyaltyPoints = 0;
+
+    /**
+     * Dorobek punktowy uczestnika: suma punktow faktycznie zdobytych, nigdy
+     * nie pomniejszana przez wymiane punktow na kupon ani przez wygasniecie.
+     * To z niej wyznaczany jest poziom lojalnosciowy -- korzystanie z programu
+     * nie moze obnizac statusu klienta.
+     */
+    @Column(name = "lifetime_points", nullable = false)
+    @Builder.Default
+    private Integer lifetimePoints = 0;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private CustomerStatus status = CustomerStatus.ACTIVE;
+
+    @Column(name = "status_changed_at")
+    private LocalDateTime statusChangedAt;
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
 
     @Column(length = 64)
     private String referralCode;
@@ -52,6 +75,17 @@ public class Customer {
     @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<Transaction> transactions = new ArrayList<>();
+
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+        if (status == null) {
+            status = CustomerStatus.ACTIVE;
+        }
+        if (lifetimePoints == null) {
+            lifetimePoints = 0;
+        }
+    }
 }
-
-

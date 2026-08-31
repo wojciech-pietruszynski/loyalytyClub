@@ -3,6 +3,7 @@ package pl.pietruszynski.loyaltyclub.api.admin.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pl.pietruszynski.loyaltyclub.api.admin.model.Customer;
 import pl.pietruszynski.loyaltyclub.api.admin.model.LoyaltyTier;
 import pl.pietruszynski.loyaltyclub.api.admin.repository.LoyaltyTierRepository;
 
@@ -16,17 +17,27 @@ public class LoyaltyTierService {
     private final LoyaltyTierRepository loyaltyTierRepository;
 
     /**
-     * Najwyzszy prog, ktory saldo punktow osiaga. Zwraca {@code null},
-     * gdy saldo jest nieznane albo nie zdefiniowano zadnego progu.
+     * Poziom uczestnika. Liczony z dorobku punktowego, a nie z biezacego salda --
+     * wymiana punktow na kupon ani ich wygasniecie nie moga obnizyc statusu.
      */
-    public String resolveTierCode(Integer loyaltyPoints) {
-        if (loyaltyPoints == null) {
+    public String resolveTierCode(Customer customer) {
+        if (customer == null) {
             return null;
         }
-        List<LoyaltyTier> tiers = loyaltyTierRepository.findAllByOrderByMinPointsAsc();
+        return resolveTierCode(customer.getLifetimePoints());
+    }
+
+    /**
+     * Najwyzszy prog, ktory osiaga podana liczba punktow. Zwraca {@code null},
+     * gdy wartosc jest nieznana albo nie zdefiniowano zadnego progu.
+     */
+    public String resolveTierCode(Integer points) {
+        if (points == null) {
+            return null;
+        }
         String tierCode = null;
-        for (LoyaltyTier tier : tiers) {
-            if (loyaltyPoints >= tier.getMinPoints()) {
+        for (LoyaltyTier tier : loyaltyTierRepository.findAllByOrderByMinPointsAsc()) {
+            if (points >= tier.getMinPoints()) {
                 tierCode = tier.getCode();
             }
         }

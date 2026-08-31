@@ -4,17 +4,21 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.pietruszynski.loyaltyclub.api.admin.model.Customer;
+import pl.pietruszynski.loyaltyclub.api.admin.model.CustomerStatus;
 import pl.pietruszynski.loyaltyclub.api.admin.model.Transaction;
 import pl.pietruszynski.loyaltyclub.api.admin.model.TransactionState;
 import pl.pietruszynski.loyaltyclub.api.admin.model.TransactionType;
 import pl.pietruszynski.loyaltyclub.api.admin.repository.CustomerRepository;
 import pl.pietruszynski.loyaltyclub.api.admin.repository.TransactionRepository;
+import pl.pietruszynski.loyaltyclub.api.admin.service.CustomerPointsService;
+import pl.pietruszynski.loyaltyclub.api.admin.service.ReferralRewardService;
 import pl.pietruszynski.loyaltyclub.api.store.dto.StorePointsBalanceResponse;
 import pl.pietruszynski.loyaltyclub.api.store.dto.StoreReturnRequest;
 import pl.pietruszynski.loyaltyclub.api.store.dto.StoreSaleRequest;
 import pl.pietruszynski.loyaltyclub.api.store.dto.StoreTransactionItemRequest;
 import pl.pietruszynski.loyaltyclub.api.store.dto.StoreTransactionResponse;
 import pl.pietruszynski.loyaltyclub.api.store.model.HierarchyPromotion;
+import pl.pietruszynski.loyaltyclub.exception.BusinessException;
 import pl.pietruszynski.loyaltyclub.exception.ResourceNotFoundException;
 
 import java.math.BigDecimal;
@@ -34,10 +38,13 @@ public class StoreTransactionService {
     private final TransactionRepository transactionRepository;
     private final StorePromotionService storePromotionService;
     private final HierarchyPromotionService hierarchyPromotionService;
+    private final CustomerPointsService customerPointsService;
+    private final ReferralRewardService referralRewardService;
 
     @Transactional
     public StoreTransactionResponse registerSale(String countryCode, StoreSaleRequest request) {
         Customer customer = findCustomerByNumber(request.customerNumber());
+        ensurePointOperationsAllowed(customer);
         LocalDateTime purchaseTimestamp = request.purchaseTimestamp() == null ? LocalDateTime.now() : request.purchaseTimestamp();
         String normalizedCountryCode = normalizeCountryCode(countryCode);
         String normalizedSourceTransactionNumber = normalizeSourceTransactionNumber(request.sourceTransactionNumber(), "sourceTransactionNumber");
@@ -63,13 +70,18 @@ public class StoreTransactionService {
                 .sourceTransactionNumber(normalizedSourceTransactionNumber)
                 .build());
 
-        refreshCustomerPoints(customer);
+        // Premia za polecenie nalezy sie przy pierwszym kwalifikujacym sie zakupie
+        // poleconego; sprawdzenie jest bezpieczne przy powtorzeniach.
+        referralRewardService.awardIfEligible(customer, transaction);
+
+        customerPointsService.refresh(customer);
         return toResponse(transaction);
     }
 
     @Transactional
     public StoreTransactionResponse registerReturn(String countryCode, StoreReturnRequest request) {
         Customer customer = findCustomerByNumber(request.customerNumber());
+        ensurePointOperationsAllowed(customer);
         String normalizedCountryCode = normalizeCountryCode(countryCode);
         String normalizedSourceTransactionNumber = normalizeSourceTransactionNumber(request.sourceTransactionNumber(), "sourceTransactionNumber");
         String normalizedSaleTransactionNumber = normalizeSourceTransactionNumber(request.saleTransactionNumber(), "saleTransactionNumber");
@@ -89,40 +101,21 @@ public class StoreTransactionService {
             throw new IllegalArgumentException("Return country must match sale transaction country");
         }
 
-        TransactionState currentSaleState = resolveState(saleTransaction, LocalDateTime.now());
-        if (currentSaleState == TransactionState.EXPIRED) {
-            throw new IllegalArgumentException("Cannot process return for expired points");
-        }
-
         BigDecimal alreadyReturnedAmount = transactionRepository.sumAmountBySourceTransactionIdAndType(saleTransaction.getId(), TransactionType.RETURN);
         BigDecimal remainingAmount = saleTransaction.getAmount().subtract(alreadyReturnedAmount);
         if (request.totalAmount().compareTo(remainingAmount) > 0) {
             throw new IllegalArgumentException("Return amount exceeds remaining sale amount");
         }
 
-        int alreadyReturnedPoints = Math.abs(transactionRepository.sumPointsBySourceTransactionIdAndType(saleTransaction.getId(), TransactionType.RETURN));
-        int maxReversiblePoints = saleTransaction.getPoints() - alreadyReturnedPoints;
-
-        int safePointsToReverse;
-        if (saleTransaction.getPoints() == 0) {
-            safePointsToReverse = 0;
-        } else {
-            if (maxReversiblePoints <= 0) {
-                throw new IllegalArgumentException("No points left to reverse for this sale");
-            }
-            int pointsToReverse = calculatePoints(request.totalAmount(), saleTransaction.getPointsPerCurrency());
-            safePointsToReverse = Math.min(pointsToReverse, maxReversiblePoints);
-            if (safePointsToReverse <= 0) {
-                throw new IllegalArgumentException("Return amount is too small to reverse any points");
-            }
-        }
+        TransactionState currentSaleState = customerPointsService.resolveState(saleTransaction, LocalDateTime.now());
+        int safePointsToReverse = resolvePointsToReverse(saleTransaction, request.totalAmount(), currentSaleState);
 
         Transaction returnTransaction = transactionRepository.save(Transaction.builder()
                 .customer(customer)
                 .points(-safePointsToReverse)
                 .amount(request.totalAmount().setScale(2, RoundingMode.HALF_UP))
                 .pointsPerCurrency(saleTransaction.getPointsPerCurrency())
-                .description("Store return: " + normalizedSourceTransactionNumber)
+                .description(returnDescription(normalizedSourceTransactionNumber, currentSaleState))
                 .country(normalizedCountryCode)
                 .type(TransactionType.RETURN)
                 .state(currentSaleState)
@@ -133,14 +126,14 @@ public class StoreTransactionService {
                 .sourceTransactionNumber(normalizedSourceTransactionNumber)
                 .build());
 
-        refreshCustomerPoints(customer);
+        customerPointsService.refresh(customer);
         return toResponse(returnTransaction);
     }
 
     @Transactional
     public StorePointsBalanceResponse getPointsBalance(String customerNumber) {
         Customer customer = findCustomerByNumber(customerNumber);
-        List<Transaction> transactions = refreshCustomerPoints(customer);
+        List<Transaction> transactions = customerPointsService.refresh(customer);
 
         int pending = 0;
         int available = 0;
@@ -162,9 +155,51 @@ public class StoreTransactionService {
         );
     }
 
+    /**
+     * Liczba punktow do cofniecia przy zwrocie.
+     *
+     * <p>Zwrot punktow, ktore zdazyly wygasnac, jest rejestrowany z korekta zerowa
+     * zamiast odmowy. Towar mozna zwrocic fizycznie takze po roku, a odmowa zapisu
+     * oznaczalaby, ze zdarzenie handlowe nie trafia do historii w ogole -- przy
+     * czym saldo i tak nie moze sie zmienic, bo tych punktow juz nie ma.
+     */
+    private int resolvePointsToReverse(Transaction saleTransaction, BigDecimal returnedAmount, TransactionState saleState) {
+        if (saleState == TransactionState.EXPIRED || saleTransaction.getPoints() == 0) {
+            return 0;
+        }
+
+        int alreadyReturnedPoints = Math.abs(
+                transactionRepository.sumPointsBySourceTransactionIdAndType(saleTransaction.getId(), TransactionType.RETURN));
+        int maxReversiblePoints = saleTransaction.getPoints() - alreadyReturnedPoints;
+        if (maxReversiblePoints <= 0) {
+            throw new IllegalArgumentException("No points left to reverse for this sale");
+        }
+
+        int pointsToReverse = calculatePoints(returnedAmount, saleTransaction.getPointsPerCurrency());
+        int safePointsToReverse = Math.min(pointsToReverse, maxReversiblePoints);
+        if (safePointsToReverse <= 0) {
+            throw new IllegalArgumentException("Return amount is too small to reverse any points");
+        }
+        return safePointsToReverse;
+    }
+
+    private String returnDescription(String sourceTransactionNumber, TransactionState saleState) {
+        return saleState == TransactionState.EXPIRED
+                ? "Store return (points already expired, no reversal): " + sourceTransactionNumber
+                : "Store return: " + sourceTransactionNumber;
+    }
+
     private Customer findCustomerByNumber(String customerNumber) {
         return customerRepository.findByCustomerNumber(customerNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer not found for customerNumber: " + customerNumber));
+    }
+
+    private void ensurePointOperationsAllowed(Customer customer) {
+        CustomerStatus status = customer.getStatus() == null ? CustomerStatus.ACTIVE : customer.getStatus();
+        if (!status.allowsPointOperations()) {
+            throw new BusinessException("Customer account is " + status.name().toLowerCase(Locale.ROOT)
+                    + " and cannot take part in point operations");
+        }
     }
 
     private void validateTotalAmountAgainstItems(List<StoreTransactionItemRequest> items, BigDecimal totalAmount) {
@@ -213,47 +248,6 @@ public class StoreTransactionService {
         }
         BigDecimal points = amount.multiply(pointsPerCurrency);
         return points.setScale(0, RoundingMode.DOWN).intValueExact();
-    }
-
-    private List<Transaction> refreshCustomerPoints(Customer customer) {
-        LocalDateTime now = LocalDateTime.now();
-        List<Transaction> transactions = transactionRepository.findAllByCustomerIdOrderByPurchaseTimestampAsc(customer.getId());
-        boolean changed = false;
-
-        for (Transaction transaction : transactions) {
-            TransactionState resolvedState = resolveState(transaction, now);
-            if (transaction.getState() != resolvedState) {
-                transaction.setState(resolvedState);
-                changed = true;
-            }
-        }
-
-        if (changed) {
-            transactionRepository.saveAll(transactions);
-        }
-
-        int availablePoints = transactions.stream()
-                .filter(transaction -> transaction.getState() == TransactionState.AVAILABLE)
-                .mapToInt(Transaction::getPoints)
-                .sum();
-
-        customer.setLoyaltyPoints(availablePoints);
-        customerRepository.save(customer);
-
-        return transactions;
-    }
-
-    private TransactionState resolveState(Transaction transaction, LocalDateTime now) {
-        if (transaction.getType() == TransactionType.MANUAL_ADJUSTMENT) {
-            return TransactionState.AVAILABLE;
-        }
-        if (now.isBefore(transaction.getAvailableFrom())) {
-            return TransactionState.PENDING;
-        }
-        if (now.isAfter(transaction.getExpiresAt())) {
-            return TransactionState.EXPIRED;
-        }
-        return TransactionState.AVAILABLE;
     }
 
     private int calculatePointsWithHierarchy(List<StoreTransactionItemRequest> items, BigDecimal baseRate, List<HierarchyPromotion> promotions) {

@@ -1,12 +1,15 @@
 package pl.pietruszynski.loyaltyclub.api.ecom.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.CustomerCouponDto;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.TransactionDto;
 import pl.pietruszynski.loyaltyclub.api.admin.model.Customer;
 import pl.pietruszynski.loyaltyclub.api.admin.model.CustomerCoupon;
+import pl.pietruszynski.loyaltyclub.api.admin.model.CustomerStatus;
 import pl.pietruszynski.loyaltyclub.api.admin.model.Transaction;
 import pl.pietruszynski.loyaltyclub.api.admin.repository.CustomerCouponRepository;
 import pl.pietruszynski.loyaltyclub.api.admin.repository.CustomerRepository;
@@ -17,6 +20,7 @@ import pl.pietruszynski.loyaltyclub.api.store.dto.StorePointsBalanceResponse;
 import pl.pietruszynski.loyaltyclub.api.store.service.StoreTransactionService;
 import pl.pietruszynski.loyaltyclub.exception.ResourceNotFoundException;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -49,8 +53,10 @@ public class EcomService {
                 customer.getPhoneNumber(),
                 customer.getCountry(),
                 customer.getLoyaltyPoints(),
-                loyaltyTierService.resolveTierCode(customer.getLoyaltyPoints()),
-                customer.getReferralCode()
+                customer.getLifetimePoints(),
+                loyaltyTierService.resolveTierCode(customer),
+                customer.getReferralCode(),
+                (customer.getStatus() == null ? CustomerStatus.ACTIVE : customer.getStatus()).name()
         );
     }
 
@@ -61,11 +67,23 @@ public class EcomService {
                 .toList();
     }
 
+    public Page<TransactionDto> getTransactions(String customerNumber, Pageable pageable) {
+        Customer customer = findCustomer(customerNumber);
+        return transactionRepository.findAllByCustomerId(customer.getId(), pageable)
+                .map(this::mapToTransactionDto);
+    }
+
     public List<CustomerCouponDto> getCoupons(String customerNumber) {
         Customer customer = findCustomer(customerNumber);
         return customerCouponRepository.findAllByCustomerIdOrderByIssuedAtDesc(customer.getId()).stream()
                 .map(this::mapToCustomerCouponDto)
                 .toList();
+    }
+
+    public Page<CustomerCouponDto> getCoupons(String customerNumber, Pageable pageable) {
+        Customer customer = findCustomer(customerNumber);
+        return customerCouponRepository.findAllByCustomerId(customer.getId(), pageable)
+                .map(this::mapToCustomerCouponDto);
     }
 
     private Customer findCustomer(String customerNumber) {
@@ -80,6 +98,10 @@ public class EcomService {
                 .description(transaction.getDescription())
                 .timestamp(transaction.getTimestamp())
                 .availableFrom(transaction.getAvailableFrom())
+                .expiresAt(transaction.getExpiresAt())
+                .amount(transaction.getAmount())
+                .type(transaction.getType() == null ? null : transaction.getType().name())
+                .state(transaction.getState() == null ? null : transaction.getState().name())
                 .build();
     }
 
@@ -97,7 +119,7 @@ public class EcomService {
                 .validityDays(customerCoupon.getCouponTemplate().getValidityDays())
                 .couponPrefix(customerCoupon.getCouponTemplate().getCouponPrefix())
                 .reason(customerCoupon.getReason() == null ? "POINTS_EXCHANGE" : customerCoupon.getReason().name())
-                .status(customerCoupon.getStatus() == null ? "ACTIVE" : customerCoupon.getStatus().name())
+                .status(customerCoupon.effectiveStatus(LocalDateTime.now()).name())
                 .issuedAt(customerCoupon.getIssuedAt())
                 .expiresAt(customerCoupon.getExpiresAt())
                 .build();

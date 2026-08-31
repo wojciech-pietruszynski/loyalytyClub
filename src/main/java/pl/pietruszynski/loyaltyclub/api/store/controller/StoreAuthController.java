@@ -2,46 +2,56 @@ package pl.pietruszynski.loyaltyclub.api.store.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.LoginRequest;
 import pl.pietruszynski.loyaltyclub.api.admin.dto.LoginResponse;
-import pl.pietruszynski.loyaltyclub.api.admin.security.JwtService;
-import pl.pietruszynski.loyaltyclub.api.store.security.StoreUserDetailsService;
+import pl.pietruszynski.loyaltyclub.security.AuthenticationTokenService;
+import pl.pietruszynski.loyaltyclub.security.AuthenticationTokenService.IssuedToken;
 
 @RestController
 @RequestMapping("/api/store/auth")
 @RequiredArgsConstructor
 public class StoreAuthController {
 
-    private final AuthenticationManager authenticationManager;
-    private final StoreUserDetailsService storeUserDetailsService;
-    private final JwtService jwtService;
+    private static final String ROLE = "STORE";
+    private static final String AUTHORITY = "ROLE_STORE";
+
+    private final AuthenticationTokenService authenticationTokenService;
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        storeUserDetailsService.loadUserByUsername(request.username());
+        return ResponseEntity.ok(toResponse(
+                authenticationTokenService.login(request.username(), request.password(), AUTHORITY, ROLE)));
+    }
 
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.username(), request.password())
-        );
+    /** Odpowiednik {@code /api/admin/auth/refresh} -- kasa nie musi przechowywac hasla. */
+    @PostMapping("/refresh")
+    public ResponseEntity<LoginResponse> refresh(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).build();
+        }
+        return ResponseEntity.ok(toResponse(authenticationTokenService.refresh(authentication, ROLE)));
+    }
 
-        UserDetails principal = (UserDetails) authentication.getPrincipal();
-        String token = jwtService.generateToken(principal.getUsername(), "STORE");
-        long expiresAt = jwtService.extractExpirationEpochMillis(token);
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader) {
+        authenticationTokenService.logout(authorizationHeader);
+        return ResponseEntity.noContent().build();
+    }
 
-        return ResponseEntity.ok(LoginResponse.builder()
-                .token(token)
-                .expiresAt(expiresAt)
-                .role("STORE")
+    private LoginResponse toResponse(IssuedToken issued) {
+        return LoginResponse.builder()
+                .token(issued.token())
+                .expiresAt(issued.expiresAt())
+                .role(issued.role())
                 .country(null)
-                .build());
+                .build();
     }
 }

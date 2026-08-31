@@ -190,10 +190,9 @@ App.tsx  (główny komponent, orkiestrator)
 | ORM | Spring Data JPA / Hibernate | 3.2.3 | Mapowanie obiektowo-relacyjne |
 | Baza danych | PostgreSQL | 15 | RDBMS, ACID |
 | Migracje | Liquibase | 4.x | Wersjonowanie schematu bazy |
-| Budowanie | Apache Maven | 3.x | Zarządzanie zależnościami, build, profile |
+| Budowanie | Apache Maven | 3.x | Zarządzanie zależnościami i budowaniem |
 | Pokrycie kodu | JaCoCo | **0.8.11** | Raport XML → SonarQube |
 | Jakość kodu | SonarQube | 10.x | Statyczna analiza kodu |
-| Konteneryzacja frontendu | frontend-maven-plugin | **1.15.0** | Node.js v20 zarządzany przez Maven |
 
 **Dlaczego Java 21?**
 > Wirtualne wątki (`spring.threads.virtual.enabled=true`) – skalowalność bez zmiany kodu aplikacji.
@@ -497,9 +496,9 @@ GitHub (master branch)
   ║    JENKINS    ║
   ╠═══════════════╣
   ║ 1. Checkout   ║  git clone
-  ║ 2. Testy      ║  mvn test -P build-backend
+  ║ 2. Testy      ║  mvn test
   ║ 3. SonarQube  ║  mvn sonar:sonar
-  ║ 4. Build      ║  mvn package -P build-frontend
+  ║ 4. Build      ║  mvn clean package -DskipTests
   ║ 5. Stop       ║  pkill -f loyaltyClub.jar
   ║ 6. Archive    ║  mv loyaltyClub.jar → archive/
   ║ 7. Deploy     ║  cp target/*.jar → /home/wojciech/
@@ -522,7 +521,7 @@ GitHub (master branch)
 ### Etap 2: Testy jednostkowe
 ```groovy
 stage('Testy jednostkowe (Backend)') {
-    steps { sh 'mvn test -P build-backend' }
+    steps { sh 'mvn test' }
     post { always { junit 'target/surefire-reports/*.xml' } }
 }
 ```
@@ -536,11 +535,11 @@ withCredentials([string(credentialsId: 'loyalty-club', variable: 'SONAR_TOKEN')]
 ```
 > Token w Jenkins Credentials Store – **nigdy nie w kodzie źródłowym**.
 
-### Etap 4: Build fullstack
+### Etap 4: Build backendu
 ```groovy
-sh 'mvn clean package -P build-frontend -DskipTests'
+sh 'mvn clean package -DskipTests'
 ```
-> Maven plugin pobiera Node.js v20, instaluje npm, buduje React SPA, kopiuje do `static/` i pakuje jako jeden JAR.
+> Backend jest samodzielnym serwisem API – pakowany jako wykonywalny JAR. Frontend budowany jest w osobnym repozytorium.
 
 ### Etap 8: Weryfikacja startu
 ```bash

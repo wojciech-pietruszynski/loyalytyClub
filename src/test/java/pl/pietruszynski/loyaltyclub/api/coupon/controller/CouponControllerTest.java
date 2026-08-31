@@ -19,6 +19,7 @@ import pl.pietruszynski.loyaltyclub.api.coupon.model.CouponValidationStatus;
 import pl.pietruszynski.loyaltyclub.api.coupon.service.CouponService;
 import pl.pietruszynski.loyaltyclub.api.ecom.security.EcomUserDetailsService;
 import pl.pietruszynski.loyaltyclub.api.store.security.StoreUserDetailsService;
+import pl.pietruszynski.loyaltyclub.security.TokenRevocationService;
 
 import java.time.LocalDateTime;
 
@@ -40,6 +41,7 @@ class CouponControllerTest {
     @MockBean AdminUserDetailsService adminUserDetailsService;
     @MockBean StoreUserDetailsService storeUserDetailsService;
     @MockBean EcomUserDetailsService ecomUserDetailsService;
+    @MockBean TokenRevocationService tokenRevocationService;
 
     @Test
     void redeemPoints_valid_shouldReturn200() throws Exception {

@@ -173,12 +173,15 @@ Clone the frontend repository and follow its README. Its dev server proxies `/ap
 
 ---
 
-## Build Profiles
+## Build Commands
 
-| Profile | Command | What it does |
-|---------|---------|-------------|
-| `build-backend` | `mvn test -P build-backend` | Compile + unit test backend only |
-| `e2e` | `mvn verify -P e2e -DskipTests` | Start Postgres + the app, run Playwright API tests from `e2e/` |
+The project is a backend-only service, so the build needs no Maven profiles.
+
+| Command | What it does |
+|---------|-------------|
+| `mvn test` | Run all unit and controller tests + JaCoCo report |
+| `mvn clean package -DskipTests` | Build the runnable JAR |
+| `mvn sonar:sonar` | Send the JaCoCo report to SonarQube |
 
 ---
 
@@ -224,7 +227,7 @@ Migrations are **additive and idempotent** — never modify existing changesets.
 18 test classes covering controllers, services, security filters, and exception handling.
 
 ```bash
-mvn test -P build-backend
+mvn test
 ```
 
 | Layer | Framework |
@@ -247,7 +250,7 @@ Jenkins declarative pipeline at `jenkins/build.jenkinsfile`.
 | Stage | Description |
 |-------|-------------|
 | Checkout | Clone repository |
-| Unit Tests | `mvn test -P build-backend`, publishes JUnit XML |
+| Unit Tests | `mvn test`, publishes JUnit XML |
 | SonarQube Analysis | `mvn sonar:sonar` using Jenkins credential `loyalty-club` |
 | Backend Build | `mvn clean package -DskipTests` |
 | Stop & Archive | Kill previous process, archive JAR with timestamp |
@@ -441,12 +444,15 @@ Sklonuj repozytorium frontendu i postępuj zgodnie z jego README. Jego serwer de
 
 ---
 
-## Profile Maven
+## Komendy budowania
 
-| Profil | Komenda | Co robi |
-|--------|---------|---------|
-| `build-backend` | `mvn test -P build-backend` | Kompilacja i testy jednostkowe wyłącznie backendu |
-| `e2e` | `mvn verify -P e2e -DskipTests` | Start Postgresa i aplikacji, uruchomienie testów Playwright z katalogu `e2e/` |
+Projekt jest wyłącznie backendem, więc budowanie nie wymaga profili Mavena.
+
+| Komenda | Co robi |
+|---------|---------|
+| `mvn test` | Uruchamia wszystkie testy jednostkowe i testy kontrolerów + raport JaCoCo |
+| `mvn clean package -DskipTests` | Buduje uruchamialny JAR |
+| `mvn sonar:sonar` | Wysyła raport JaCoCo do SonarQube |
 
 ---
 
@@ -492,7 +498,7 @@ Migracje są **addytywne i idempotentne** — nie modyfikuj istniejących change
 18 klas testowych obejmujących kontrolery, serwisy, filtry bezpieczeństwa i obsługę wyjątków.
 
 ```bash
-mvn test -P build-backend
+mvn test
 ```
 
 | Warstwa | Framework |
@@ -515,7 +521,7 @@ Deklaratywny potok Jenkinsa w pliku `jenkins/build.jenkinsfile`.
 | Etap | Opis |
 |------|------|
 | Pobranie kodu | Klonowanie repozytorium |
-| Testy jednostkowe | `mvn test -P build-backend`, publikacja raportów JUnit |
+| Testy jednostkowe | `mvn test`, publikacja raportów JUnit |
 | Analiza SonarQube | `mvn sonar:sonar` z użyciem credentiala Jenkinsa `loyalty-club` |
 | Budowanie Backendu | `mvn clean package -DskipTests` |
 | Zatrzymanie i archiwizacja | Zatrzymanie poprzedniego procesu, archiwizacja JAR ze znacznikiem czasu |

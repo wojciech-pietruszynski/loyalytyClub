@@ -37,6 +37,11 @@ public class CustomerCoupon {
     @Column(nullable = false, length = 30, columnDefinition = "varchar(30) default 'POINTS_EXCHANGE'")
     private CouponReason reason;
 
+    /**
+     * Stan utrwalony. Do prezentacji i raportowania nalezy uzywac
+     * {@link #effectiveStatus(LocalDateTime)} -- kupon, ktorego nikt nie probowal
+     * uzyc, ma tutaj nadal {@code ACTIVE} mimo uplynietej daty waznosci.
+     */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20, columnDefinition = "varchar(20) default 'ACTIVE'")
     private CouponStatus status;
@@ -46,4 +51,18 @@ public class CustomerCoupon {
 
     @Column(nullable = false)
     private LocalDateTime expiresAt;
+
+    /**
+     * Stan wyliczony z dat -- tak samo jak stan transakcji punktowej. Stany koncowe
+     * ({@code USED}, {@code CANCELLED}) sa nietykalne; {@code ACTIVE} po uplynieciu
+     * daty waznosci jest raportowany jako {@code EXPIRED} niezaleznie od tego,
+     * czy ktokolwiek probowal kupon zwalidowac.
+     */
+    public CouponStatus effectiveStatus(LocalDateTime now) {
+        CouponStatus persisted = status == null ? CouponStatus.ACTIVE : status;
+        if (persisted.isFinal()) {
+            return persisted;
+        }
+        return expiresAt != null && !now.isBefore(expiresAt) ? CouponStatus.EXPIRED : persisted;
+    }
 }
