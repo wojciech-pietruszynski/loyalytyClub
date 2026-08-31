@@ -7,7 +7,7 @@ import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfi
 import org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration;
 import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import pl.pietruszynski.loyaltyclub.api.admin.security.AdminUserDetailsService;
@@ -36,12 +36,12 @@ class CouponControllerTest {
 
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
-    @MockBean CouponService couponService;
-    @MockBean JwtService jwtService;
-    @MockBean AdminUserDetailsService adminUserDetailsService;
-    @MockBean StoreUserDetailsService storeUserDetailsService;
-    @MockBean EcomUserDetailsService ecomUserDetailsService;
-    @MockBean TokenRevocationService tokenRevocationService;
+    @MockitoBean CouponService couponService;
+    @MockitoBean JwtService jwtService;
+    @MockitoBean AdminUserDetailsService adminUserDetailsService;
+    @MockitoBean StoreUserDetailsService storeUserDetailsService;
+    @MockitoBean EcomUserDetailsService ecomUserDetailsService;
+    @MockitoBean TokenRevocationService tokenRevocationService;
 
     @Test
     void redeemPoints_valid_shouldReturn200() throws Exception {

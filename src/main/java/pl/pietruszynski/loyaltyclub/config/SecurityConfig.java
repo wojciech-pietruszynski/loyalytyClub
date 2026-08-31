@@ -136,24 +136,21 @@ public class SecurityConfig {
 
     @Bean
     public DaoAuthenticationProvider adminAuthenticationProvider() {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(adminUserDetailsService);
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(adminUserDetailsService);
         provider.setPasswordEncoder(passwordEncoder());
         return provider;
     }
 
     @Bean
     public DaoAuthenticationProvider storeAuthenticationProvider() {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(storeUserDetailsService);
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(storeUserDetailsService);
         provider.setPasswordEncoder(passwordEncoder());
         return provider;
     }
 
     @Bean
     public DaoAuthenticationProvider ecomAuthenticationProvider() {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(ecomUserDetailsService);
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(ecomUserDetailsService);
         provider.setPasswordEncoder(passwordEncoder());
         return provider;
     }

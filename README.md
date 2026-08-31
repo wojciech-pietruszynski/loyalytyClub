@@ -1,6 +1,6 @@
 # LoyaltyClub — Loyalty Program System (Backend)
 
-The **backend** of an enterprise loyalty program, built with Java 21 + Spring Boot 3.2. It exposes the REST API for customer management, loyalty point accrual via POS transactions, coupon issuance and redemption, and a multi-role admin API with country-scoped access control.
+The **backend** of an enterprise loyalty program, built with Java 25 + Spring Boot 3.5. It exposes the REST API for customer management, loyalty point accrual via POS transactions, coupon issuance and redemption, and a multi-role admin API with country-scoped access control.
 
 > The React admin panel lives in a separate repository: **loyaltyClub-frontend**. This repository no longer builds or embeds it.
 
@@ -19,6 +19,7 @@ The **backend** of an enterprise loyalty program, built with Java 21 + Spring Bo
 9. [Testing](#testing)
 10. [CI/CD Pipeline](#cicd-pipeline)
 11. [Project Structure](#project-structure)
+12. [Java 25 Migration](#java-25-migration)
 
 ---
 
@@ -27,15 +28,36 @@ The **backend** of an enterprise loyalty program, built with Java 21 + Spring Bo
 ### Backend
 | Technology | Version | Role |
 |------------|---------|------|
-| Java (Amazon Corretto) | 21 | Runtime |
-| Spring Boot | 3.2.3 | Web + Data JPA framework |
-| PostgreSQL | 15 | Relational database |
-| Liquibase | — | Database migrations |
-| JJWT | 0.12.6 | JWT auth (HMAC-SHA512) |
-| Lombok | — | Boilerplate reduction |
+| Java | 25 | Language level and runtime (class file version 69) |
+| Spring Boot | 3.5.16 | Web + Data JPA framework |
+| Spring Framework / Spring Security | 6.2.x / 6.5.x | Managed by Spring Boot |
+| Hibernate ORM | 6.6.x | JPA provider, managed by Spring Boot |
+| PostgreSQL | 15 (server) / 42.7.x (driver) | Relational database |
+| Liquibase | 4.31.x | Database migrations, managed by Spring Boot |
+| springdoc-openapi | 2.8.17 | OpenAPI spec + Swagger UI |
+| JJWT | 0.13.0 | JWT auth (HMAC-SHA512) |
+| Lombok | 1.18.46 | Boilerplate reduction — pinned, see below |
+| JUnit 5 / Mockito / Byte Buddy | 5.12.x / 5.23.0 / 1.18.12 | Tests — Mockito and Byte Buddy pinned, see below |
 | JaCoCo | 0.8.15 | Code coverage |
-| SonarQube / Sonar Maven | 4.0.0 | Static code analysis |
-| Maven | — | Build tool |
+| SonarQube / Sonar Maven | 5.7.0 | Static code analysis |
+| Maven | 3.9+ | Build tool |
+
+Three versions are pinned in `pom.xml` above what `spring-boot-starter-parent`
+manages, because the managed ones do not understand Java 25 class files:
+
+| Pinned | Why |
+|--------|-----|
+| `lombok.version` | Older Lombok silently stops generating code on a newer JDK; the failure looks like missing methods, not like a build problem. |
+| `mockito.version` | Older Mockito cannot instrument classes on JDK 25 — every test with a mock fails with `Could not modify all classes`. |
+| `byte-buddy.version` | Raised together with Mockito, otherwise Boot's dependency management pulls Mockito's transitive Byte Buddy back down. |
+
+Two more build details that Java 25 forces:
+
+- `maven-compiler-plugin` declares Lombok in `annotationProcessorPaths`. Since
+  JDK 23 `javac` no longer runs annotation processors found on the class path.
+- Surefire starts the Mockito agent with `-javaagent` (path resolved by
+  `maven-dependency-plugin`) instead of letting Mockito attach it to the running
+  JVM. Self-attach warns on JDK 25 and is slated to be disallowed.
 
 ---
 
@@ -151,8 +173,8 @@ Point accrual and returns remain on **`/api/store`** (POS). Coupon redemption an
 
 ### Prerequisites
 - Docker Desktop
-- JDK 21
-- Maven 3.x
+- JDK 25
+- Maven 3.9+ (must itself run on JDK 25 — check with `mvn -v`)
 
 ### 1. Start the database
 ```bash
@@ -192,10 +214,11 @@ Key properties in `src/main/resources/application.properties`:
 | Property | Default | Description |
 |----------|---------|-------------|
 | `server.port` | `8089` | HTTP port |
-| `app.jwt.expiration-ms` | `900000` | JWT expiry (15 min) |
-| `app.jwt.secret` | *(base64 key)* | HMAC-SHA512 secret — override via `JWT_SECRET` env var in production |
+| `security.jwt.expiration-ms` | `900000` | JWT expiry (15 min) |
+| `security.jwt.secret` | *(base64 key)* | HMAC-SHA512 secret — override via `JWT_SECRET` env var in production |
 | `app.available-country-codes` | `PL,DE,CZ,SK,LT` | Countries enabled for multi-tenancy |
-| `app.default-store-points-rate` | `1.00` | Points earned per currency unit |
+| `app.store.default-points-per-currency` | `1.00` | Points earned per currency unit |
+| `springdoc.api-docs.version` | `openapi_3_0` | Emitted OpenAPI version. springdoc 2.7+ defaults to 3.1; pinned to 3.0 so generated client SDKs keep reading the same contract. Remove the line to emit 3.1 |
 | `app.cors.allowed-origins` | *(empty)* | Comma-separated frontend origins allowed for CORS on `/api/**`. Empty disables CORS — override via `CORS_ALLOWED_ORIGINS` |
 | `spring.datasource.url` | `jdbc:postgresql://localhost:5433/loyalty_db` | Database URL |
 
@@ -224,7 +247,7 @@ Migrations are **additive and idempotent** — never modify existing changesets.
 ## Testing
 
 ### Backend
-18 test classes covering controllers, services, security filters, and exception handling.
+29 test classes / 297 tests covering controllers, services, security filters, and exception handling.
 
 ```bash
 mvn test
@@ -234,6 +257,7 @@ mvn test
 |-------|-----------|
 | Service unit tests | JUnit 5 + Mockito + AssertJ |
 | Controller tests | `@WebMvcTest` + MockMvc (Security auto-config excluded) |
+| Bean mocking | `@MockitoBean` — Boot's `@MockBean` is deprecated for removal |
 | Coverage report | JaCoCo XML → SonarQube |
 
 Coverage target: **≥ 90%** line coverage for service and controller classes.
@@ -246,6 +270,10 @@ Frontend tests live in the frontend repository.
 ## CI/CD Pipeline
 
 Jenkins declarative pipeline at `jenkins/build.jenkinsfile`.
+
+The agent must provide JDK 25 — the pipeline pins
+`JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64`. Adjust the path if the agent
+installs the JDK elsewhere.
 
 | Stage | Description |
 |-------|-------------|
@@ -282,13 +310,62 @@ loyaltyclub/
 
 The React admin panel is maintained in its own repository (`loyaltyClub-frontend`), together with its coding standards (`docs/frontend_rules.md`).
 
+
+---
+
+## Java 25 Migration
+
+The project moved from Java 21 / Spring Boot 3.2.3 to **Java 25 / Spring Boot 3.5.16**.
+Compiled artefacts are class file version 69, so **the whole toolchain — Maven
+included — has to run on JDK 25**.
+
+### What changed
+
+| Area | Before | After |
+|------|--------|-------|
+| Language level and runtime | 21 | 25 |
+| Spring Boot | 3.2.3 | 3.5.16 |
+| springdoc-openapi | 2.3.0 | 2.8.17 |
+| JJWT | 0.12.6 | 0.13.0 (single `jjwt.version` property) |
+| Lombok | 1.18.42 | 1.18.46 |
+| Byte Buddy | 1.17.7 | 1.18.12 |
+| Sonar Maven plugin | 4.0.0.4121 | 5.7.0.6970 |
+| Mockito agent | self-attached, silenced with `-XX:+EnableDynamicAgentLoading` | started with `-javaagent` |
+| Bean mocking in tests | `@MockBean` | `@MockitoBean` |
+| `DaoAuthenticationProvider` | no-arg constructor + `setUserDetailsService` | constructor taking the `UserDetailsService` |
+
+Boot-managed transitive versions moved with the parent: Spring Framework 6.2.x,
+Spring Security 6.5.x, Hibernate ORM 6.6.x, Liquibase 4.31.x, PostgreSQL driver
+42.7.x, JUnit 5.12.x.
+
+### Deliberately not changed
+
+- **Liquibase stays on the Boot-managed 4.x.** Jumping to 5.x is a major upgrade
+  against an existing changelog history and is unrelated to Java 25.
+- **PostgreSQL stays at server 15** in `docker-compose.yml`. Bumping the image
+  would require a data migration of the existing volume.
+- **The emitted OpenAPI version stays at 3.0.** See
+  `springdoc.api-docs.version` in [Configuration](#configuration) — the contract
+  feeds generated client SDKs, so the migration does not change it silently.
+- **Spring Boot 4.x** is a separate migration: it brings Spring Framework 7 and
+  Spring Security 7, removes `@MockBean` outright, and needs springdoc 3.x. The
+  two deprecation fixes above already remove the blockers this codebase had.
+
+### Verification
+
+`mvn clean verify` builds with no compiler warnings and 297 passing tests. The
+packaged JAR was started on JDK 25 against the docker-compose database:
+Liquibase applied cleanly, `/v3/api-docs` returned all 59 paths and 46 schemas,
+Swagger UI loaded, and an unauthenticated `/api/admin/**` call still returned
+401.
+
 ---
 
 ---
 
 # LoyaltyClub — System Programu Lojalnościowego (Backend)
 
-**Backend** aplikacji enterprise loyalty program zbudowany w technologii Java 21 + Spring Boot 3.2. Udostępnia REST API do zarządzania klientami, naliczania punktów lojalnościowych przez transakcje kasowe, emisji i realizacji kuponów oraz wielorolowe API administracyjne z kontrolą dostępu ograniczoną do krajów.
+**Backend** aplikacji enterprise loyalty program zbudowany w technologii Java 25 + Spring Boot 3.5. Udostępnia REST API do zarządzania klientami, naliczania punktów lojalnościowych przez transakcje kasowe, emisji i realizacji kuponów oraz wielorolowe API administracyjne z kontrolą dostępu ograniczoną do krajów.
 
 > Panel administracyjny w React znajduje się w osobnym repozytorium: **loyaltyClub-frontend**. To repozytorium już go nie buduje ani nie osadza w JAR-ze.
 
@@ -307,6 +384,7 @@ The React admin panel is maintained in its own repository (`loyaltyClub-frontend
 9. [Testy](#testy)
 10. [Potok CI/CD](#potok-cicd)
 11. [Struktura projektu](#struktura-projektu)
+12. [Migracja na Javę 25](#migracja-na-javę-25)
 
 ---
 
@@ -315,15 +393,38 @@ The React admin panel is maintained in its own repository (`loyaltyClub-frontend
 ### Backend
 | Technologia | Wersja | Rola |
 |-------------|--------|------|
-| Java (Amazon Corretto) | 21 | Środowisko uruchomieniowe |
-| Spring Boot | 3.2.3 | Framework Web + Data JPA |
-| PostgreSQL | 15 | Relacyjna baza danych |
-| Liquibase | — | Migracje schematu bazy |
-| JJWT | 0.12.6 | Autoryzacja JWT (HMAC-SHA512) |
-| Lombok | — | Redukcja kodu szablonowego |
+| Java | 25 | Poziom języka i środowisko uruchomieniowe (class file 69) |
+| Spring Boot | 3.5.16 | Framework Web + Data JPA |
+| Spring Framework / Spring Security | 6.2.x / 6.5.x | Wersje zarządzane przez Spring Boot |
+| Hibernate ORM | 6.6.x | Dostawca JPA, wersja zarządzana przez Spring Boot |
+| PostgreSQL | 15 (serwer) / 42.7.x (sterownik) | Relacyjna baza danych |
+| Liquibase | 4.31.x | Migracje schematu, wersja zarządzana przez Spring Boot |
+| springdoc-openapi | 2.8.17 | Specyfikacja OpenAPI + Swagger UI |
+| JJWT | 0.13.0 | Autoryzacja JWT (HMAC-SHA512) |
+| Lombok | 1.18.46 | Redukcja kodu szablonowego — wersja przypięta, patrz niżej |
+| JUnit 5 / Mockito / Byte Buddy | 5.12.x / 5.23.0 / 1.18.12 | Testy — Mockito i Byte Buddy przypięte, patrz niżej |
 | JaCoCo | 0.8.15 | Pokrycie kodu testami |
-| SonarQube / Sonar Maven | 4.0.0 | Statyczna analiza kodu |
-| Maven | — | Narzędzie budowania |
+| SonarQube / Sonar Maven | 5.7.0 | Statyczna analiza kodu |
+| Maven | 3.9+ | Narzędzie budowania |
+
+Trzy wersje są przypięte w `pom.xml` ponad to, czym zarządza
+`spring-boot-starter-parent`, bo wersje zarządzane nie znają formatu plików
+klas Javy 25:
+
+| Przypięte | Dlaczego |
+|-----------|----------|
+| `lombok.version` | Starszy Lombok na nowszym JDK cicho przestaje generować kod; błędy wyglądają jak brakujące metody, a nie jak problem z budowaniem. |
+| `mockito.version` | Starsze Mockito nie potrafi instrumentować klas na JDK 25 — wszystkie testy z mockami wywalają się na `Could not modify all classes`. |
+| `byte-buddy.version` | Podnoszone razem z Mockito, inaczej zarządzanie zależnościami Boota cofa przechodnią wersję Byte Buddy z Mockito. |
+
+Dwa dodatkowe elementy budowania wymuszone przez Javę 25:
+
+- `maven-compiler-plugin` podaje Lombok w `annotationProcessorPaths`. Od JDK 23
+  `javac` nie uruchamia już procesorów adnotacji znalezionych na ścieżce klas.
+- Surefire startuje agenta Mockito przez `-javaagent` (ścieżkę wystawia
+  `maven-dependency-plugin`), zamiast pozwalać Mockito doładować go do
+  działającej JVM. Samodoładowanie na JDK 25 wypisuje ostrzeżenie i ma zostać
+  zabronione.
 
 ---
 
@@ -422,8 +523,8 @@ Tokeny JWT wygasają po **15 minutach** i są automatycznie odświeżane przez f
 
 ### Wymagania wstępne
 - Docker Desktop
-- JDK 21
-- Maven 3.x
+- JDK 25
+- Maven 3.9+ (musi sam działać na JDK 25 — sprawdź przez `mvn -v`)
 
 ### 1. Uruchomienie bazy danych
 ```bash
@@ -463,10 +564,11 @@ Kluczowe właściwości w `src/main/resources/application.properties`:
 | Właściwość | Domyślna wartość | Opis |
 |------------|-----------------|------|
 | `server.port` | `8089` | Port HTTP |
-| `app.jwt.expiration-ms` | `900000` | Czas życia JWT (15 min) |
-| `app.jwt.secret` | *(klucz base64)* | Sekret HMAC-SHA512 — w produkcji nadpisz zmienną env `JWT_SECRET` |
+| `security.jwt.expiration-ms` | `900000` | Czas życia JWT (15 min) |
+| `security.jwt.secret` | *(klucz base64)* | Sekret HMAC-SHA512 — w produkcji nadpisz zmienną env `JWT_SECRET` |
 | `app.available-country-codes` | `PL,DE,CZ,SK,LT` | Kraje włączone w multi-tenancy |
-| `app.default-store-points-rate` | `1.00` | Punkty naliczane za jednostkę waluty |
+| `app.store.default-points-per-currency` | `1.00` | Punkty naliczane za jednostkę waluty |
+| `springdoc.api-docs.version` | `openapi_3_0` | Wersja generowanej specyfikacji OpenAPI. springdoc od 2.7 domyślnie generuje 3.1; przypięte do 3.0, żeby generowane biblioteki klienckie czytały ten sam kontrakt co dotąd. Usunięcie linii przełącza na 3.1 |
 | `app.cors.allowed-origins` | *(puste)* | Originy frontendu dopuszczone do CORS na `/api/**`, po przecinku. Puste = CORS wyłączony — nadpisz zmienną `CORS_ALLOWED_ORIGINS` |
 | `spring.datasource.url` | `jdbc:postgresql://localhost:5433/loyalty_db` | URL bazy danych |
 
@@ -495,7 +597,7 @@ Migracje są **addytywne i idempotentne** — nie modyfikuj istniejących change
 ## Testy
 
 ### Backend
-18 klas testowych obejmujących kontrolery, serwisy, filtry bezpieczeństwa i obsługę wyjątków.
+29 klas testowych / 297 testów obejmujących kontrolery, serwisy, filtry bezpieczeństwa i obsługę wyjątków.
 
 ```bash
 mvn test
@@ -505,6 +607,7 @@ mvn test
 |---------|-----------|
 | Testy jednostkowe serwisów | JUnit 5 + Mockito + AssertJ |
 | Testy kontrolerów | `@WebMvcTest` + MockMvc (wyłączona autokonfiguracja Security) |
+| Podmiana beanów na mocki | `@MockitoBean` — `@MockBean` z Boota jest oznaczone jako do usunięcia |
 | Raport pokrycia | JaCoCo XML → SonarQube |
 
 Docelowe pokrycie: **≥ 90%** linii kodu dla klas serwisów i kontrolerów.
@@ -517,6 +620,10 @@ Testy frontendu znajdują się w repozytorium frontendu.
 ## Potok CI/CD
 
 Deklaratywny potok Jenkinsa w pliku `jenkins/build.jenkinsfile`.
+
+Agent musi udostępniać JDK 25 — potok ustawia na sztywno
+`JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64`. Jeśli agent instaluje JDK
+w innym miejscu, popraw tę ścieżkę.
 
 | Etap | Opis |
 |------|------|
@@ -552,3 +659,51 @@ loyaltyclub/
 ```
 
 Panel administracyjny w React rozwijany jest w osobnym repozytorium (`loyaltyClub-frontend`) wraz ze swoimi standardami kodowania (`docs/frontend_rules.md`).
+
+---
+
+## Migracja na Javę 25
+
+Projekt przeszedł z Javy 21 / Spring Boota 3.2.3 na **Javę 25 / Spring Boota 3.5.16**.
+Artefakty kompilują się do formatu class file 69, więc **cały zestaw narzędzi —
+łącznie z Mavenem — musi działać na JDK 25**.
+
+### Co się zmieniło
+
+| Obszar | Przed | Po |
+|--------|-------|-----|
+| Poziom języka i środowisko | 21 | 25 |
+| Spring Boot | 3.2.3 | 3.5.16 |
+| springdoc-openapi | 2.3.0 | 2.8.17 |
+| JJWT | 0.12.6 | 0.13.0 (jedna właściwość `jjwt.version`) |
+| Lombok | 1.18.42 | 1.18.46 |
+| Byte Buddy | 1.17.7 | 1.18.12 |
+| Wtyczka Sonar Maven | 4.0.0.4121 | 5.7.0.6970 |
+| Agent Mockito | doładowywany w locie, wyciszony przez `-XX:+EnableDynamicAgentLoading` | startowany przez `-javaagent` |
+| Podmiana beanów w testach | `@MockBean` | `@MockitoBean` |
+| `DaoAuthenticationProvider` | konstruktor bezargumentowy + `setUserDetailsService` | konstruktor przyjmujący `UserDetailsService` |
+
+Wersje przechodnie zarządzane przez Boota poszły w górę razem z rodzicem:
+Spring Framework 6.2.x, Spring Security 6.5.x, Hibernate ORM 6.6.x,
+Liquibase 4.31.x, sterownik PostgreSQL 42.7.x, JUnit 5.12.x.
+
+### Świadomie niezmienione
+
+- **Liquibase zostaje na zarządzanej przez Boota wersji 4.x.** Przejście na 5.x
+  to zmiana major na istniejącej historii changelogów i nie ma związku z Javą 25.
+- **PostgreSQL zostaje na serwerze 15** w `docker-compose.yml`. Podniesienie
+  obrazu wymagałoby migracji danych z istniejącego wolumenu.
+- **Generowana specyfikacja OpenAPI zostaje w wersji 3.0.** Patrz
+  `springdoc.api-docs.version` w [Konfiguracji](#konfiguracja) — kontrakt jest
+  źródłem generowanych bibliotek klienckich, więc migracja nie zmienia go po cichu.
+- **Spring Boot 4.x** to osobna migracja: przynosi Spring Framework 7
+  i Spring Security 7, całkiem usuwa `@MockBean` i wymaga springdoc 3.x. Dwie
+  powyższe poprawki deprecacji zdejmują blokady, które miał ten kod.
+
+### Weryfikacja
+
+`mvn clean verify` buduje się bez ostrzeżeń kompilatora i przechodzi 297 testów.
+Spakowany JAR został uruchomiony na JDK 25 na bazie z docker-compose:
+Liquibase zaaplikował zmiany poprawnie, `/v3/api-docs` zwróciło wszystkie
+59 ścieżek i 46 schematów, Swagger UI się załadował, a niezalogowane wywołanie
+`/api/admin/**` nadal zwróciło 401.
