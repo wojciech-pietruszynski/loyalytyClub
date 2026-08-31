@@ -33,7 +33,7 @@ The **backend** of an enterprise loyalty program, built with Java 21 + Spring Bo
 | Liquibase | — | Database migrations |
 | JJWT | 0.12.6 | JWT auth (HMAC-SHA512) |
 | Lombok | — | Boilerplate reduction |
-| JaCoCo | 0.8.11 | Code coverage |
+| JaCoCo | 0.8.15 | Code coverage |
 | SonarQube / Sonar Maven | 4.0.0 | Static code analysis |
 | Maven | — | Build tool |
 
@@ -321,7 +321,7 @@ The React admin panel is maintained in its own repository (`loyaltyClub-frontend
 | Liquibase | — | Migracje schematu bazy |
 | JJWT | 0.12.6 | Autoryzacja JWT (HMAC-SHA512) |
 | Lombok | — | Redukcja kodu szablonowego |
-| JaCoCo | 0.8.11 | Pokrycie kodu testami |
+| JaCoCo | 0.8.15 | Pokrycie kodu testami |
 | SonarQube / Sonar Maven | 4.0.0 | Statyczna analiza kodu |
 | Maven | — | Narzędzie budowania |
 

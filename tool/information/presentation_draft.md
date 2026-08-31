@@ -191,7 +191,7 @@ App.tsx  (główny komponent, orkiestrator)
 | Baza danych | PostgreSQL | 15 | RDBMS, ACID |
 | Migracje | Liquibase | 4.x | Wersjonowanie schematu bazy |
 | Budowanie | Apache Maven | 3.x | Zarządzanie zależnościami i budowaniem |
-| Pokrycie kodu | JaCoCo | **0.8.11** | Raport XML → SonarQube |
+| Pokrycie kodu | JaCoCo | **0.8.15** | Raport XML → SonarQube |
 | Jakość kodu | SonarQube | 10.x | Statyczna analiza kodu |
 
 **Dlaczego Java 21?**

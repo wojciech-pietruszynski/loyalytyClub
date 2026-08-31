@@ -33,6 +33,12 @@
         -->
         <mockito.version>5.23.0</mockito.version>
         <byte-buddy.version>1.17.7</byte-buddy.version>
+        <!--
+            Wartosc domyslna dla argLine JaCoCo. Nadpisywana przez prepare-agent;
+            pusta wartosc pozwala zbudowac projekt takze z -Djacoco.skip=true,
+            gdy prepare-agent w ogole nie ustawi tej wlasciwosci.
+        -->
+        <jacocoArgLine></jacocoArgLine>
         <!-- SonarQube -->
         <sonar.projectKey>loyalty-club</sonar.projectKey>
         <sonar.host.url>http://192.168.100.150:9000</sonar.host.url>
@@ -145,14 +151,35 @@
                     </excludes>
                 </configuration>
             </plugin>
+            <!--
+                Mockito dolacza agenta Byte Buddy w trakcie dzialania JVM.
+                Od JDK 21 takie doladowanie wypisuje ostrzezenie, a docelowo
+                ma byc domyslnie zabronione; flaga wlacza je swiadomie.
+                @{jacocoArgLine} dokleja agenta pokrycia, ktory bez tego
+                zostalby nadpisany przez wlasne argLine.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>@{jacocoArgLine} -XX:+EnableDynamicAgentLoading</argLine>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.11</version>
+                <!--
+                    0.8.11 nie zna formatu plikow klas z JDK 25 i wysypuje sie
+                    przy instrumentacji klas mockow generowanych w locie.
+                -->
+                <version>0.8.15</version>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>
                         <goals><goal>prepare-agent</goal></goals>
+                        <configuration>
+                            <propertyName>jacocoArgLine</propertyName>
+                        </configuration>
                     </execution>
                     <execution>
                         <id>report</id>
