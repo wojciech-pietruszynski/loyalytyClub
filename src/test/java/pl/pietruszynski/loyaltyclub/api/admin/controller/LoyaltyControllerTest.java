@@ -7,7 +7,7 @@ import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfi
 import org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration;
 import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
@@ -52,15 +52,15 @@ class LoyaltyControllerTest {
 
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
-    @MockBean LoyaltyService loyaltyService;
-    @MockBean CustomerPrivacyService customerPrivacyService;
-    @MockBean LoyaltyTierService loyaltyTierService;
-    @MockBean TechnicalUserService technicalUserService;
-    @MockBean JwtService jwtService;
-    @MockBean AdminUserDetailsService adminUserDetailsService;
-    @MockBean StoreUserDetailsService storeUserDetailsService;
-    @MockBean EcomUserDetailsService ecomUserDetailsService;
-    @MockBean TokenRevocationService tokenRevocationService;
+    @MockitoBean LoyaltyService loyaltyService;
+    @MockitoBean CustomerPrivacyService customerPrivacyService;
+    @MockitoBean LoyaltyTierService loyaltyTierService;
+    @MockitoBean TechnicalUserService technicalUserService;
+    @MockitoBean JwtService jwtService;
+    @MockitoBean AdminUserDetailsService adminUserDetailsService;
+    @MockitoBean StoreUserDetailsService storeUserDetailsService;
+    @MockitoBean EcomUserDetailsService ecomUserDetailsService;
+    @MockitoBean TokenRevocationService tokenRevocationService;
 
     // -----------------------------------------------------------------------
     // GET /api/admin/customers

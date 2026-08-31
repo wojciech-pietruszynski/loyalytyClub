@@ -6,7 +6,7 @@ import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfi
 import org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration;
 import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import pl.pietruszynski.loyaltyclub.api.admin.security.AdminUserDetailsService;
 import pl.pietruszynski.loyaltyclub.api.admin.security.JwtService;
@@ -25,12 +25,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class EcomControllerTest {
 
     @Autowired MockMvc mockMvc;
-    @MockBean EcomService ecomService;
-    @MockBean JwtService jwtService;
-    @MockBean AdminUserDetailsService adminUserDetailsService;
-    @MockBean StoreUserDetailsService storeUserDetailsService;
-    @MockBean EcomUserDetailsService ecomUserDetailsService;
-    @MockBean TokenRevocationService tokenRevocationService;
+    @MockitoBean EcomService ecomService;
+    @MockitoBean JwtService jwtService;
+    @MockitoBean AdminUserDetailsService adminUserDetailsService;
+    @MockitoBean StoreUserDetailsService storeUserDetailsService;
+    @MockitoBean EcomUserDetailsService ecomUserDetailsService;
+    @MockitoBean TokenRevocationService tokenRevocationService;
 
     @Test
     void info_shouldReturnStatusReady() throws Exception {

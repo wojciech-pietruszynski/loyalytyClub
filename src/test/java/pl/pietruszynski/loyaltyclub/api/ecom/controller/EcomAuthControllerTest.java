@@ -7,7 +7,7 @@ import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfi
 import org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration;
 import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -48,12 +48,12 @@ class EcomAuthControllerTest {
 
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
-    @MockBean AuthenticationManager authenticationManager;
-    @MockBean JwtService jwtService;
-    @MockBean AdminUserDetailsService adminUserDetailsService;
-    @MockBean StoreUserDetailsService storeUserDetailsService;
-    @MockBean EcomUserDetailsService ecomUserDetailsService;
-    @MockBean TokenRevocationService tokenRevocationService;
+    @MockitoBean AuthenticationManager authenticationManager;
+    @MockitoBean JwtService jwtService;
+    @MockitoBean AdminUserDetailsService adminUserDetailsService;
+    @MockitoBean StoreUserDetailsService storeUserDetailsService;
+    @MockitoBean EcomUserDetailsService ecomUserDetailsService;
+    @MockitoBean TokenRevocationService tokenRevocationService;
 
     @Test
     void login_validCredentials_shouldReturnEcomToken() throws Exception {
