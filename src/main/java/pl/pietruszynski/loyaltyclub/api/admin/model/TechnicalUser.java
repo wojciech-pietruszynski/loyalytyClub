@@ -3,6 +3,8 @@ package pl.pietruszynski.loyaltyclub.api.admin.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "technical_users")
 @Getter
@@ -20,11 +22,15 @@ public class TechnicalUser {
     @Column(nullable = false, unique = true)
     private String username;
 
+    /**
+     * Wylacznie skrot BCrypt. Haslo w postaci jawnej nie jest nigdzie utrwalane --
+     * jest prezentowane jednorazowo w odpowiedzi na utworzenie konta albo na reset.
+     */
     @Column(nullable = false)
     private String password;
 
-    @Column(name = "password_preview", nullable = false)
-    private String passwordPreview;
+    @Column(name = "password_changed_at")
+    private LocalDateTime passwordChangedAt;
 
     @Column(nullable = false, length = 3)
     private String country;
@@ -32,4 +38,11 @@ public class TechnicalUser {
     @Column(nullable = false)
     @Builder.Default
     private boolean enabled = true;
+
+    @PrePersist
+    protected void onCreate() {
+        if (passwordChangedAt == null) {
+            passwordChangedAt = LocalDateTime.now();
+        }
+    }
 }

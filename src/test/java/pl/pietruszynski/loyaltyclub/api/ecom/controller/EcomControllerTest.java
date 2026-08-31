@@ -11,7 +11,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import pl.pietruszynski.loyaltyclub.api.admin.security.AdminUserDetailsService;
 import pl.pietruszynski.loyaltyclub.api.admin.security.JwtService;
 import pl.pietruszynski.loyaltyclub.api.ecom.security.EcomUserDetailsService;
+import pl.pietruszynski.loyaltyclub.api.ecom.service.EcomService;
 import pl.pietruszynski.loyaltyclub.api.store.security.StoreUserDetailsService;
+import pl.pietruszynski.loyaltyclub.security.TokenRevocationService;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -23,10 +25,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class EcomControllerTest {
 
     @Autowired MockMvc mockMvc;
+    @MockBean EcomService ecomService;
     @MockBean JwtService jwtService;
     @MockBean AdminUserDetailsService adminUserDetailsService;
     @MockBean StoreUserDetailsService storeUserDetailsService;
     @MockBean EcomUserDetailsService ecomUserDetailsService;
+    @MockBean TokenRevocationService tokenRevocationService;
 
     @Test
     void info_shouldReturnStatusReady() throws Exception {

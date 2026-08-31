@@ -1,5 +1,6 @@
 package pl.pietruszynski.loyaltyclub.api.store.service;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -11,6 +12,8 @@ import pl.pietruszynski.loyaltyclub.api.admin.model.TransactionState;
 import pl.pietruszynski.loyaltyclub.api.admin.model.TransactionType;
 import pl.pietruszynski.loyaltyclub.api.admin.repository.CustomerRepository;
 import pl.pietruszynski.loyaltyclub.api.admin.repository.TransactionRepository;
+import pl.pietruszynski.loyaltyclub.api.admin.service.CustomerPointsService;
+import pl.pietruszynski.loyaltyclub.api.admin.service.ReferralRewardService;
 import pl.pietruszynski.loyaltyclub.api.store.dto.*;
 import pl.pietruszynski.loyaltyclub.api.store.model.HierarchyPromotion;
 import pl.pietruszynski.loyaltyclub.api.store.model.HierarchyPromotionType;
@@ -33,9 +36,26 @@ class StoreTransactionServiceTest {
     @Mock private TransactionRepository transactionRepository;
     @Mock private StorePromotionService storePromotionService;
     @Mock private HierarchyPromotionService hierarchyPromotionService;
+    @Mock private CustomerPointsService customerPointsService;
+    @Mock private ReferralRewardService referralRewardService;
 
     @InjectMocks
     private StoreTransactionService storeTransactionService;
+
+    /**
+     * Przeliczanie sald przeniesiono do {@link CustomerPointsService}; testy kasy
+     * maja sprawdzac zapis transakcji, ale nadal potrzebuja prawdziwej reguly
+     * wyznaczania stanu z dat.
+     */
+    @BeforeEach
+    void delegateToRealPointsService() {
+        CustomerPointsService real = new CustomerPointsService(customerRepository, transactionRepository);
+        lenient().when(customerPointsService.resolveState(any(), any()))
+                .thenAnswer(inv -> real.resolveState(inv.getArgument(0), inv.getArgument(1)));
+        lenient().when(customerPointsService.refresh(any()))
+                .thenAnswer(inv -> real.refresh(inv.getArgument(0)));
+        lenient().when(referralRewardService.awardIfEligible(any(), any())).thenReturn(java.util.Optional.empty());
+    }
 
     // -----------------------------------------------------------------------
     // registerSale
@@ -317,8 +337,13 @@ class StoreTransactionServiceTest {
                 .hasMessageContaining("country");
     }
 
+    /**
+     * Towar mozna zwrocic fizycznie takze po roku. Odmowa zapisu oznaczalaby, ze
+     * zdarzenie handlowe nie trafia do historii w ogole; rejestrujemy zwrot
+     * z korekta zerowa, bo tych punktow i tak juz nie ma.
+     */
     @Test
-    void registerReturn_expiredSale_shouldThrow() {
+    void registerReturn_expiredSale_shouldRecordReturnWithZeroPointCorrection() {
         Customer customer = customer("C001", 100);
         customer.setId(1L);
 
@@ -340,10 +365,18 @@ class StoreTransactionServiceTest {
         when(transactionRepository.existsBySourceTransactionNumber("RET-006")).thenReturn(false);
         when(transactionRepository.findBySourceTransactionNumberAndCustomerId("SALE-005", 1L))
                 .thenReturn(Optional.of(sale));
+        when(transactionRepository.sumAmountBySourceTransactionIdAndType(any(), eq(TransactionType.RETURN)))
+                .thenReturn(BigDecimal.ZERO);
+        when(transactionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0), 42L));
+        when(transactionRepository.findAllByCustomerIdOrderByPurchaseTimestampAsc(any()))
+                .thenReturn(Collections.emptyList());
+        when(customerRepository.save(any())).thenReturn(customer);
 
-        assertThatThrownBy(() -> storeTransactionService.registerReturn("PL", returnRequest))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("expired");
+        StoreTransactionResponse response = storeTransactionService.registerReturn("PL", returnRequest);
+
+        assertThat(response.type()).isEqualTo(TransactionType.RETURN);
+        assertThat(response.points()).isZero();
+        assertThat(response.state()).isEqualTo(TransactionState.EXPIRED);
     }
 
     @Test
@@ -577,8 +610,7 @@ class StoreTransactionServiceTest {
                 .thenReturn(Optional.of(sale));
         when(transactionRepository.sumAmountBySourceTransactionIdAndType(any(), eq(TransactionType.RETURN)))
                 .thenReturn(BigDecimal.ZERO);
-        when(transactionRepository.sumPointsBySourceTransactionIdAndType(any(), eq(TransactionType.RETURN)))
-                .thenReturn(0);
+        // Sprzedaz bez punktow konczy sie korekta zerowa bez odpytywania o juz cofniete punkty.
         when(transactionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0), 20L));
         when(transactionRepository.findAllByCustomerIdOrderByPurchaseTimestampAsc(any())).thenReturn(Collections.emptyList());
         when(customerRepository.save(any())).thenReturn(customer);
@@ -635,5 +667,47 @@ class StoreTransactionServiceTest {
     private Transaction withId(Transaction t, Long id) {
         t.setId(id);
         return t;
+    }
+
+    // -----------------------------------------------------------------------
+    // Premia za polecenie
+    // -----------------------------------------------------------------------
+
+    /**
+     * Relacja polecenia byla utrwalana, ale nic za nia nie przyznawalo punktow.
+     * Sprawdzenie premii uruchamia teraz kazdy zapis sprzedazy.
+     */
+    @Test
+    void registerSale_shouldEvaluateReferralReward() {
+        Customer customer = customer("C001", 0);
+        StoreSaleRequest request = saleRequest("C001", "TXN-REF", new BigDecimal("100.00"));
+
+        when(customerRepository.findByCustomerNumber("C001")).thenReturn(Optional.of(customer));
+        when(transactionRepository.existsBySourceTransactionNumber("TXN-REF")).thenReturn(false);
+        when(storePromotionService.resolvePointsPerCurrency(eq("PL"), any())).thenReturn(new BigDecimal("1.00"));
+        when(hierarchyPromotionService.getActivePromotions(eq("PL"), any())).thenReturn(Collections.emptyList());
+        when(hierarchyPromotionService.isItemExcluded(any(), any())).thenReturn(false);
+        when(hierarchyPromotionService.resolveItemMultiplier(any(), any())).thenReturn(BigDecimal.ONE);
+        when(transactionRepository.save(any())).thenAnswer(inv -> withId(inv.getArgument(0), 1L));
+        when(transactionRepository.findAllByCustomerIdOrderByPurchaseTimestampAsc(any())).thenReturn(Collections.emptyList());
+        when(customerRepository.save(any())).thenReturn(customer);
+
+        storeTransactionService.registerSale("PL", request);
+
+        verify(referralRewardService).awardIfEligible(eq(customer), any(Transaction.class));
+    }
+
+    /** Konto zawieszone nie bierze udzialu w naliczaniu punktow. */
+    @Test
+    void registerSale_inactiveCustomer_shouldThrow() {
+        Customer customer = customer("C001", 0);
+        customer.setStatus(pl.pietruszynski.loyaltyclub.api.admin.model.CustomerStatus.INACTIVE);
+        StoreSaleRequest request = saleRequest("C001", "TXN-INACTIVE", new BigDecimal("100.00"));
+
+        when(customerRepository.findByCustomerNumber("C001")).thenReturn(Optional.of(customer));
+
+        assertThatThrownBy(() -> storeTransactionService.registerSale("PL", request))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("cannot take part in point operations");
     }
 }

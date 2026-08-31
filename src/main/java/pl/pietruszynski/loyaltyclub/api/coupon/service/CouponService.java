@@ -10,6 +10,7 @@ import pl.pietruszynski.loyaltyclub.api.admin.model.CouponStatus;
 import pl.pietruszynski.loyaltyclub.api.admin.model.CouponTemplate;
 import pl.pietruszynski.loyaltyclub.api.admin.model.Customer;
 import pl.pietruszynski.loyaltyclub.api.admin.model.CustomerCoupon;
+import pl.pietruszynski.loyaltyclub.api.admin.model.CustomerStatus;
 import pl.pietruszynski.loyaltyclub.api.admin.model.Transaction;
 import pl.pietruszynski.loyaltyclub.api.admin.model.TransactionState;
 import pl.pietruszynski.loyaltyclub.api.admin.model.TransactionType;
@@ -24,6 +25,7 @@ import pl.pietruszynski.loyaltyclub.api.coupon.dto.CouponValidationResponse;
 import pl.pietruszynski.loyaltyclub.api.coupon.model.CouponRedemptionRequest;
 import pl.pietruszynski.loyaltyclub.api.coupon.model.CouponValidationStatus;
 import pl.pietruszynski.loyaltyclub.api.coupon.repository.CouponRedemptionRequestRepository;
+import pl.pietruszynski.loyaltyclub.api.admin.service.CustomerPointsService;
 import pl.pietruszynski.loyaltyclub.exception.ResourceNotFoundException;
 import pl.pietruszynski.loyaltyclub.util.CouponCodeGenerator;
 
@@ -43,6 +45,7 @@ public class CouponService {
     private final CustomerCouponRepository customerCouponRepository;
     private final TransactionRepository transactionRepository;
     private final CouponRedemptionRequestRepository couponRedemptionRequestRepository;
+    private final CustomerPointsService customerPointsService;
 
     @Transactional
     public CouponRedeemResponse redeemPointsForCoupon(CouponRedeemRequest request, String idempotencyKey) {
@@ -75,12 +78,14 @@ public class CouponService {
             throw new IllegalArgumentException("Customer country does not match coupon template country");
         }
 
+        CustomerStatus status = customer.getStatus() == null ? CustomerStatus.ACTIVE : customer.getStatus();
+        if (!status.allowsPointOperations()) {
+            throw new IllegalArgumentException("Customer account is not active");
+        }
+
         if (customer.getLoyaltyPoints() < couponTemplate.getRequiredPoints()) {
             throw new IllegalArgumentException("Not enough points to exchange for this coupon");
         }
-
-        customer.setLoyaltyPoints(customer.getLoyaltyPoints() - couponTemplate.getRequiredPoints());
-        customerRepository.save(customer);
 
         transactionRepository.save(Transaction.builder()
                 .customer(customer)
@@ -89,9 +94,13 @@ public class CouponService {
                 .pointsPerCurrency(BigDecimal.ONE)
                 .description("Issued coupon (points exchange): " + couponTemplate.getCouponPrefix())
                 .country(customer.getCountry())
-                .type(TransactionType.MANUAL_ADJUSTMENT)
+                .type(TransactionType.POINTS_REDEMPTION)
                 .state(TransactionState.AVAILABLE)
                 .build());
+
+        // Saldo i dorobek przeliczamy z historii transakcji zamiast modyfikowac
+        // je przyrostowo -- wymiana punktow obniza saldo, ale nie dorobek.
+        customerPointsService.refresh(customer);
 
         LocalDateTime issuedAt = LocalDateTime.now();
         CustomerCoupon coupon = createCouponWithRetry(customer, couponTemplate, issuedAt);
@@ -144,45 +153,56 @@ public class CouponService {
             );
         }
 
-        if (coupon.getStatus() == CouponStatus.USED) {
-            return new CouponValidationResponse(
-                    CouponValidationStatus.COUPON_ALREADY_USED,
-                    normalizedCouponCode,
-                    normalizedCustomerNumber,
-                    coupon.getStatus().name(),
-                    coupon.getIssuedAt(),
-                    coupon.getExpiresAt(),
-                    mapDefinition(coupon.getCouponTemplate())
-            );
+        CustomerStatus customerStatus = customer.getStatus() == null ? CustomerStatus.ACTIVE : customer.getStatus();
+        if (!customerStatus.allowsPointOperations()) {
+            return validationResponse(CouponValidationStatus.CUSTOMER_NOT_ACTIVE, coupon,
+                    normalizedCouponCode, normalizedCustomerNumber, coupon.getStatus());
         }
 
-        if (isExpired(coupon)) {
-            coupon.setStatus(CouponStatus.EXPIRED);
-            customerCouponRepository.save(coupon);
-            return new CouponValidationResponse(
-                    CouponValidationStatus.COUPON_EXPIRED,
-                    normalizedCouponCode,
-                    normalizedCustomerNumber,
-                    coupon.getStatus().name(),
-                    coupon.getIssuedAt(),
-                    coupon.getExpiresAt(),
-                    mapDefinition(coupon.getCouponTemplate())
-            );
+        // Stan kuponu wyliczamy z dat przy kazdym odczycie -- tak samo jak stan
+        // transakcji punktowej. Kupon po terminie jest wygasly niezaleznie od tego,
+        // czy ktokolwiek probowal go wczesniej zwalidowac.
+        CouponStatus effectiveStatus = coupon.effectiveStatus(LocalDateTime.now());
+
+        if (effectiveStatus == CouponStatus.USED) {
+            return validationResponse(CouponValidationStatus.COUPON_ALREADY_USED, coupon,
+                    normalizedCouponCode, normalizedCustomerNumber, effectiveStatus);
         }
 
+        if (effectiveStatus == CouponStatus.CANCELLED) {
+            return validationResponse(CouponValidationStatus.COUPON_CANCELLED, coupon,
+                    normalizedCouponCode, normalizedCustomerNumber, effectiveStatus);
+        }
+
+        if (effectiveStatus == CouponStatus.EXPIRED) {
+            // Utrwalenie stanu jest tylko porzadkiem w bazie; wynik walidacji
+            // nie zalezy od tego, czy zapis sie powiedzie.
+            if (coupon.getStatus() != CouponStatus.EXPIRED) {
+                coupon.setStatus(CouponStatus.EXPIRED);
+                customerCouponRepository.save(coupon);
+            }
+            return validationResponse(CouponValidationStatus.COUPON_EXPIRED, coupon,
+                    normalizedCouponCode, normalizedCustomerNumber, effectiveStatus);
+        }
+
+        return validationResponse(CouponValidationStatus.VALID, coupon,
+                normalizedCouponCode, normalizedCustomerNumber, effectiveStatus);
+    }
+
+    private CouponValidationResponse validationResponse(CouponValidationStatus status,
+                                                        CustomerCoupon coupon,
+                                                        String couponCode,
+                                                        String customerNumber,
+                                                        CouponStatus couponStatus) {
         return new CouponValidationResponse(
-                CouponValidationStatus.VALID,
-                normalizedCouponCode,
-                normalizedCustomerNumber,
-                coupon.getStatus().name(),
+                status,
+                couponCode,
+                customerNumber,
+                couponStatus == null ? null : couponStatus.name(),
                 coupon.getIssuedAt(),
                 coupon.getExpiresAt(),
                 mapDefinition(coupon.getCouponTemplate())
         );
-    }
-
-    private boolean isExpired(CustomerCoupon coupon) {
-        return coupon.getStatus() == CouponStatus.EXPIRED || !LocalDateTime.now().isBefore(coupon.getExpiresAt());
     }
 
     private CouponDefinitionResponse mapDefinition(CouponTemplate couponTemplate) {

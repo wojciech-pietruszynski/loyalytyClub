@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
+import java.time.LocalDateTime;
+
 @MappedSuperclass
 @Getter
 @Setter
@@ -22,7 +24,17 @@ public abstract class BaseUser {
     @Column(nullable = false)
     private String password;
 
+    @Column(name = "password_changed_at")
+    private LocalDateTime passwordChangedAt;
+
     @Column(nullable = false)
     @Builder.Default
     private boolean enabled = true;
+
+    @PrePersist
+    protected void onCreate() {
+        if (passwordChangedAt == null) {
+            passwordChangedAt = LocalDateTime.now();
+        }
+    }
 }

@@ -19,6 +19,13 @@
         <sqlFile path="migrations/003_indexes_and_base_constraints.sql" relativeToChangelogFile="true"/>
     </changeSet>
 
+    <!--
+        Numer 004 nie wystepuje celowo. Zestaw zmian "004-add-country-to-transactions"
+        zostal wycofany przed pierwszym wdrozeniem, a jego tresc scalono z migracja 005
+        (uzupelnienie brakujacych kolumn na istniejacych bazach deweloperskich).
+        Numery migracji sa niezmienne po wykonaniu na jakiejkolwiek bazie, dlatego
+        luka pozostaje udokumentowana zamiast byc zapelniana.
+    -->
     <changeSet id="005-backfill-missing-columns-for-existing-dev-db" author="codex">
         <sqlFile path="migrations/005_backfill_missing_columns.sql" relativeToChangelogFile="true"/>
     </changeSet>
@@ -41,6 +48,38 @@
 
     <changeSet id="010-audit-tiers-referrals" author="codex">
         <sqlFile path="migrations/010_audit_tiers_referrals.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="011-transaction-types-reclassification" author="codex">
+        <sqlFile path="migrations/011_transaction_types_reclassification.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="012-customer-lifecycle-and-lifetime-points" author="codex">
+        <sqlFile path="migrations/012_customer_lifecycle_and_lifetime_points.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="013-referral-rewards" author="codex">
+        <sqlFile path="migrations/013_referral_rewards.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="014-technical-user-password-removal" author="codex">
+        <sqlFile path="migrations/014_technical_user_password_removal.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="015-idempotent-operations" author="codex">
+        <sqlFile path="migrations/015_idempotent_operations.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="016-token-revocation" author="codex">
+        <sqlFile path="migrations/016_token_revocation.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="017-point-expiry-notifications" author="codex">
+        <sqlFile path="migrations/017_point_expiry_notifications.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="018-read-model-indexes" author="codex">
+        <sqlFile path="migrations/018_read_model_indexes.sql" relativeToChangelogFile="true"/>
     </changeSet>
 
 </databaseChangeLog>

@@ -22,10 +22,11 @@ Skill zakłada następującą strukturę katalogów, w których śledzone są zm
 projekt/
 ├── tool/changelog/          ← tutaj zapisywane są pliki changelog
 ├── backend/
-├── frontend/
 ├── testy/
 └── opis_biznesowy/
 ```
+
+> Frontend zyje w osobnym repozytorium i ma wlasny changelog.
 
 > Jeśli projekt ma inną strukturę, zapytaj użytkownika o potwierdzenie ścieżek przed zapisem.
 
@@ -96,17 +97,6 @@ Wypełnij go według poniższego szablonu:
 
 <!-- Jakie pliki, endpointy, modele, serwisy zostały zmienione? -->
 <!-- Czy zmiany są breaking changes? -->
-
-- brak zmian  ← usuń jeśli są zmiany
-
----
-
-## Frontend
-
-> Zmiany w katalogu `frontend/`
-
-<!-- Jakie komponenty, widoki, style zostały zmienione? -->
-<!-- Czy zmiany wpływają na UX? -->
 
 - brak zmian  ← usuń jeśli są zmiany
 

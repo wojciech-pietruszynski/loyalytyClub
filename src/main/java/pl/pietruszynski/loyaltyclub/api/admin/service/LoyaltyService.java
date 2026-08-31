@@ -2,6 +2,8 @@ package pl.pietruszynski.loyaltyclub.api.admin.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,6 +19,8 @@ import pl.pietruszynski.loyaltyclub.api.admin.model.CouponStatus;
 import pl.pietruszynski.loyaltyclub.api.admin.model.CouponTemplate;
 import pl.pietruszynski.loyaltyclub.api.admin.model.Customer;
 import pl.pietruszynski.loyaltyclub.api.admin.model.CustomerCoupon;
+import pl.pietruszynski.loyaltyclub.api.admin.model.CustomerStatus;
+import pl.pietruszynski.loyaltyclub.api.admin.model.ReferralReward;
 import pl.pietruszynski.loyaltyclub.api.admin.model.Transaction;
 import pl.pietruszynski.loyaltyclub.api.admin.model.TransactionState;
 import pl.pietruszynski.loyaltyclub.api.admin.model.TransactionType;
@@ -32,6 +36,8 @@ import pl.pietruszynski.loyaltyclub.api.store.repository.HierarchyPromotionRepos
 import pl.pietruszynski.loyaltyclub.api.store.repository.StorePointsPromotionRepository;
 import pl.pietruszynski.loyaltyclub.exception.BusinessException;
 import pl.pietruszynski.loyaltyclub.exception.ResourceNotFoundException;
+import pl.pietruszynski.loyaltyclub.idempotency.IdempotencyService;
+import pl.pietruszynski.loyaltyclub.idempotency.IdempotencyService.IdempotentResult;
 import pl.pietruszynski.loyaltyclub.util.CouponCodeGenerator;
 import pl.pietruszynski.loyaltyclub.util.ReferralCodeGenerator;
 
@@ -54,6 +60,7 @@ import java.util.stream.Collectors;
 public class LoyaltyService {
 
     private static final String COUNTRY_NOT_ALLOWED = "Country code is not allowed";
+    private static final String ADD_POINTS_OPERATION = "ADD_POINTS";
 
     private final CouponCodeGenerator couponCodeGenerator;
     private final ReferralCodeGenerator referralCodeGenerator;
@@ -65,6 +72,9 @@ public class LoyaltyService {
     private final CustomerCouponRepository customerCouponRepository;
     private final StorePointsPromotionRepository storePointsPromotionRepository;
     private final HierarchyPromotionRepository hierarchyPromotionRepository;
+    private final CustomerPointsService customerPointsService;
+    private final ReferralRewardService referralRewardService;
+    private final IdempotencyService idempotencyService;
 
     @Value("${app.available-country-codes:PL}")
     private String availableCountryCodesConfig;
@@ -78,6 +88,14 @@ public class LoyaltyService {
             return customerRepository.findAllByCountry(normalizeCountryCode(countryScope));
         }
         return customerRepository.findAll();
+    }
+
+    /**
+     * Stronicowane i wyszukiwane odczyty kartoteki. Pelna kolekcja pozostaje
+     * dostepna pod dotychczasowym punktem koncowym, wiec kontrakt v1 sie nie zmienia.
+     */
+    public Page<Customer> searchCustomers(String query, String countryScope, Pageable pageable) {
+        return customerRepository.search(scopeOrNull(countryScope), likeOrNull(query), pageable);
     }
 
     public Customer getCustomerById(Long id) {
@@ -103,7 +121,7 @@ public class LoyaltyService {
 
     @Transactional
     public Customer createCustomer(Customer customer, String countryScope, String referrerCustomerNumber) {
-        validateCustomerForCreate(customer);
+        validateCustomerFields(customer);
         String normalizedCountry = normalizeCountryCode(customer.getCountry());
         ensureInScope(normalizedCountry, countryScope);
 
@@ -122,12 +140,20 @@ public class LoyaltyService {
         if (customer.getLoyaltyPoints() == null) {
             customer.setLoyaltyPoints(0);
         }
+        if (customer.getLifetimePoints() == null) {
+            customer.setLifetimePoints(customer.getLoyaltyPoints());
+        }
         customer.setCountry(normalizedCountry);
+        customer.setStatus(CustomerStatus.ACTIVE);
+        customer.setCreatedAt(LocalDateTime.now());
 
         if (referrerCustomerNumber != null && !referrerCustomerNumber.isBlank()) {
             Customer referrer = customerRepository.findByCustomerNumber(referrerCustomerNumber.trim())
                     .orElseThrow(() -> new BusinessException("Referrer customer not found"));
             ensureInScope(referrer.getCountry(), countryScope);
+            if (referrer.getStatus() != CustomerStatus.ACTIVE) {
+                throw new BusinessException("Referrer customer is not active");
+            }
             customer.setReferredBy(referrer);
         }
 
@@ -147,8 +173,11 @@ public class LoyaltyService {
 
     @Transactional
     public Customer updateCustomer(Long id, Customer updates, String countryScope) {
-        validateCustomerForUpdate(updates);
+        validateCustomerFields(updates);
         Customer customer = getCustomerById(id, countryScope);
+        if (customer.getStatus() == CustomerStatus.ANONYMIZED) {
+            throw new BusinessException("Anonymized customer cannot be edited");
+        }
         String normalizedCountry = normalizeCountryCode(updates.getCountry());
         ensureInScope(normalizedCountry, countryScope);
 
@@ -169,6 +198,28 @@ public class LoyaltyService {
         customer.setPhoneNumber(updates.getPhoneNumber());
         customer.setCountry(normalizedCountry);
 
+        return customerRepository.save(customer);
+    }
+
+    /**
+     * Zmiana stanu konta uczestnika. Kartoteka nie ma usuwania rekordu i miec go nie
+     * bedzie: transakcje i log audytowy musza sie bilansowac. Zawieszenie konta
+     * blokuje operacje punktowe, zachowujac cala historie.
+     */
+    @Transactional
+    public Customer setCustomerStatus(Long id, CustomerStatus status, String countryScope) {
+        if (status == null) {
+            throw new BusinessException("Status is required");
+        }
+        if (status == CustomerStatus.ANONYMIZED) {
+            throw new BusinessException("Anonymization must be requested through the dedicated GDPR endpoint");
+        }
+        Customer customer = getCustomerById(id, countryScope);
+        if (customer.getStatus() == CustomerStatus.ANONYMIZED) {
+            throw new BusinessException("Anonymized customer cannot change status");
+        }
+        customer.setStatus(status);
+        customer.setStatusChangedAt(LocalDateTime.now());
         return customerRepository.save(customer);
     }
 
@@ -194,6 +245,10 @@ public class LoyaltyService {
         return customerCouponRepository.findAllByOrderByIssuedAtDesc();
     }
 
+    public Page<CustomerCoupon> getIssuedCouponsPage(String countryScope, Pageable pageable) {
+        return customerCouponRepository.findPage(scopeOrNull(countryScope), pageable);
+    }
+
     public List<CustomerCoupon> getCouponsForCustomer(Long customerId) {
         return getCouponsForCustomer(customerId, null);
     }
@@ -203,6 +258,11 @@ public class LoyaltyService {
         return customerCouponRepository.findAllByCustomerIdOrderByIssuedAtDesc(customerId);
     }
 
+    public Page<CustomerCoupon> getCouponsForCustomer(Long customerId, String countryScope, Pageable pageable) {
+        getCustomerById(customerId, countryScope);
+        return customerCouponRepository.findAllByCustomerId(customerId, pageable);
+    }
+
     public List<Transaction> getTransactionsForCustomer(Long customerId) {
         return getTransactionsForCustomer(customerId, null);
     }
@@ -210,6 +270,21 @@ public class LoyaltyService {
     public List<Transaction> getTransactionsForCustomer(Long customerId, String countryScope) {
         getCustomerById(customerId, countryScope);
         return transactionRepository.findAllByCustomerIdOrderByTimestampAsc(customerId);
+    }
+
+    public Page<Transaction> getTransactionsForCustomer(Long customerId, String countryScope, Pageable pageable) {
+        getCustomerById(customerId, countryScope);
+        return transactionRepository.findAllByCustomerId(customerId, pageable);
+    }
+
+    public List<ReferralReward> getReferralRewards(Long customerId, String countryScope) {
+        getCustomerById(customerId, countryScope);
+        return referralRewardService.getRewardsGrantedTo(customerId);
+    }
+
+    public List<Customer> getReferredCustomers(Long customerId, String countryScope) {
+        getCustomerById(customerId, countryScope);
+        return customerRepository.findAllByReferredByIdOrderByIdAsc(customerId);
     }
 
     public PurchaseHistoryDto getPurchaseHistory(Long customerId, String countryScope) {
@@ -417,6 +492,7 @@ public class LoyaltyService {
         validateCouponIssueRequest(request);
 
         Customer customer = getCustomerById(request.customerId(), countryScope);
+        ensurePointOperationsAllowed(customer);
         CouponTemplate template = couponTemplateRepository.findById(request.couponTemplateId())
                 .orElseThrow(() -> new ResourceNotFoundException("Coupon template not found"));
         String normalizedCountry = normalizeCountryCode(template.getCountry());
@@ -432,20 +508,18 @@ public class LoyaltyService {
                 throw new BusinessException("Not enough points to issue this coupon");
             }
 
-            customer.setLoyaltyPoints(customer.getLoyaltyPoints() - template.getRequiredPoints());
-            customerRepository.save(customer);
-
-            Transaction transaction = Transaction.builder()
+            transactionRepository.save(Transaction.builder()
                     .customer(customer)
                     .points(-template.getRequiredPoints())
                     .amount(BigDecimal.ZERO)
                     .pointsPerCurrency(BigDecimal.ONE)
                     .description("Issued coupon (points exchange): " + template.getCouponPrefix())
                     .country(customer.getCountry())
-                    .type(TransactionType.MANUAL_ADJUSTMENT)
+                    .type(TransactionType.POINTS_REDEMPTION)
                     .state(TransactionState.AVAILABLE)
-                    .build();
-            transactionRepository.save(transaction);
+                    .build());
+
+            customerPointsService.refresh(customer);
         }
 
         LocalDateTime issuedAt = LocalDateTime.now();
@@ -461,6 +535,44 @@ public class LoyaltyService {
                 .issuedAt(issuedAt)
                 .expiresAt(issuedAt.plusDays(template.getValidityDays()))
                 .build());
+    }
+
+    /**
+     * Wycofanie wydanego kuponu -- pomylka operatora albo reklamacja. Kupon wydany
+     * za punkty zwraca je uczestnikowi osobna transakcja typu {@code POINTS_REFUND},
+     * ktora nie podnosi dorobku punktowego: klient odzyskuje saldo, a nie status.
+     */
+    @Transactional
+    public CustomerCoupon cancelCoupon(Long couponId, String countryScope) {
+        CustomerCoupon coupon = customerCouponRepository.findById(couponId)
+                .orElseThrow(() -> new ResourceNotFoundException("Coupon not found with id: " + couponId));
+        ensureInScope(coupon.getCountry(), countryScope);
+
+        CouponStatus effectiveStatus = coupon.effectiveStatus(LocalDateTime.now());
+        if (effectiveStatus == CouponStatus.USED) {
+            throw new BusinessException("Redeemed coupon cannot be cancelled");
+        }
+        if (effectiveStatus == CouponStatus.CANCELLED) {
+            return coupon;
+        }
+
+        Customer customer = coupon.getCustomer();
+        if (coupon.getReason() == CouponReason.POINTS_EXCHANGE && effectiveStatus == CouponStatus.ACTIVE) {
+            transactionRepository.save(Transaction.builder()
+                    .customer(customer)
+                    .points(coupon.getCouponTemplate().getRequiredPoints())
+                    .amount(BigDecimal.ZERO)
+                    .pointsPerCurrency(BigDecimal.ONE)
+                    .description("Cancelled coupon (points refund): " + coupon.getCouponCode())
+                    .country(coupon.getCountry())
+                    .type(TransactionType.POINTS_REFUND)
+                    .state(TransactionState.AVAILABLE)
+                    .build());
+            customerPointsService.refresh(customer);
+        }
+
+        coupon.setStatus(CouponStatus.CANCELLED);
+        return customerCouponRepository.save(coupon);
     }
 
     @Transactional
@@ -523,12 +635,34 @@ public class LoyaltyService {
         }
     }
 
+    /**
+     * Reczna korekta salda. Wymaga klucza idempotencji, bo -- inaczej niz sprzedaz --
+     * nie posiada numeru dokumentu kasowego, na ktorym opiera sie czesciowy indeks
+     * unikalny z migracji 007. Bez klucza korekta wyslana dwukrotnie (podwojne
+     * klikniecie, ponowienie po przekroczeniu limitu czasu) zapisywalaby sie dwa razy.
+     *
+     * @return transakcja korekty -- ta sama przy kazdym powtorzeniu tego samego zadania
+     */
     @Transactional
-    public void addPoints(Long customerId, Integer points, String description) {
-        Customer customer = getCustomerById(customerId);
-        customer.setLoyaltyPoints(customer.getLoyaltyPoints() + points);
+    public Transaction addPoints(Long customerId, Integer points, String description, String idempotencyKey) {
+        return idempotencyService.execute(
+                ADD_POINTS_OPERATION,
+                idempotencyKey,
+                customerId + "|" + points + "|" + description,
+                () -> {
+                    Transaction transaction = applyManualAdjustment(customerId, points, description);
+                    return new IdempotentResult<>(transaction.getId(), transaction);
+                },
+                resultId -> transactionRepository.findById(resultId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Adjustment transaction not found: " + resultId))
+        );
+    }
 
-        Transaction transaction = Transaction.builder()
+    private Transaction applyManualAdjustment(Long customerId, Integer points, String description) {
+        Customer customer = getCustomerById(customerId);
+        ensurePointOperationsAllowed(customer);
+
+        Transaction transaction = transactionRepository.save(Transaction.builder()
                 .customer(customer)
                 .points(points)
                 .amount(BigDecimal.ZERO)
@@ -537,24 +671,21 @@ public class LoyaltyService {
                 .country(customer.getCountry())
                 .type(TransactionType.MANUAL_ADJUSTMENT)
                 .state(TransactionState.AVAILABLE)
-                .build();
+                .build());
 
-        transactionRepository.save(transaction);
-        customerRepository.save(customer);
+        customerPointsService.refresh(customer);
+        return transaction;
     }
 
-    private void validateCustomerForCreate(Customer customer) {
-        if (isBlank(customer.getFirstName())
-                || isBlank(customer.getLastName())
-                || isBlank(customer.getEmail())
-                || isBlank(customer.getCustomerNumber())
-                || isBlank(customer.getPhoneNumber())
-                || isBlank(customer.getCountry())) {
-            throw new BusinessException("All customer fields are required");
+    private void ensurePointOperationsAllowed(Customer customer) {
+        CustomerStatus status = customer.getStatus() == null ? CustomerStatus.ACTIVE : customer.getStatus();
+        if (!status.allowsPointOperations()) {
+            throw new BusinessException("Customer account is " + status.name().toLowerCase(Locale.ROOT)
+                    + " and cannot take part in point operations");
         }
     }
 
-    private void validateCustomerForUpdate(Customer customer) {
+    private void validateCustomerFields(Customer customer) {
         if (isBlank(customer.getFirstName())
                 || isBlank(customer.getLastName())
                 || isBlank(customer.getEmail())
@@ -637,6 +768,18 @@ public class LoyaltyService {
             return "";
         }
         return code.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String scopeOrNull(String countryScope) {
+        return countryScope == null || countryScope.isBlank() ? null : normalizeCountryCode(countryScope);
+    }
+
+    /** Wzorzec dla LIKE; {@code null} oznacza brak filtra wyszukiwania. */
+    private String likeOrNull(String query) {
+        if (query == null || query.isBlank()) {
+            return null;
+        }
+        return "%" + query.trim().toLowerCase(Locale.ROOT) + "%";
     }
 
     private boolean isInScope(String country, String countryScope) {

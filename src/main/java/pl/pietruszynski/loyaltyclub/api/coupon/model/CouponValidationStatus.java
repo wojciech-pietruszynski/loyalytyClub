@@ -6,5 +6,11 @@ public enum CouponValidationStatus {
     CUSTOMER_NOT_FOUND,
     COUPON_BELONGS_TO_ANOTHER_ACCOUNT,
     COUPON_ALREADY_USED,
-    COUPON_EXPIRED
+    COUPON_EXPIRED,
+
+    /** Kupon wycofany przez operatora -- pomylka przy wydaniu albo reklamacja. */
+    COUPON_CANCELLED,
+
+    /** Konto uczestnika zawieszone albo zanonimizowane. */
+    CUSTOMER_NOT_ACTIVE
 }

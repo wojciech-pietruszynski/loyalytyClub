@@ -15,10 +15,30 @@
     <description>Loyalty Program Application</description>
     <properties>
         <java.version>21</java.version>
-        <frontend-maven-plugin.version>1.15.0</frontend-maven-plugin.version>
-        <frontend.workingDirectory>frontend</frontend.workingDirectory>
-        <frontend.installDirectory>target</frontend.installDirectory>
-        <frontend.resourcesDirectory>src/main/resources/static</frontend.resourcesDirectory>
+        <springdoc.version>2.3.0</springdoc.version>
+        <!--
+            Wersja zarzadzana przez spring-boot-starter-parent (1.18.30) nie obsluguje
+            JDK nowszych niz 21 i przy budowaniu na nich cicho przestaje generowac kod.
+            Projekt kompiluje sie do Javy 21, ale musi dac sie zbudowac takze
+            nowszym zestawem narzedzi.
+        -->
+        <lombok.version>1.18.42</lombok.version>
+        <!--
+            Wersje zarzadzane przez spring-boot-starter-parent (Mockito 5.7.0
+            z Byte Buddy 1.14.12) nie potrafia instrumentowac klas na JDK 25;
+            wszystkie testy z mockami wywalaja sie wtedy na
+            "Could not modify all classes". Byte Buddy podnosimy razem
+            z Mockito, bo zarzadzanie zaleznosciami Boota nadpisalo by wersje
+            przechodnia z Mockito.
+        -->
+        <mockito.version>5.23.0</mockito.version>
+        <byte-buddy.version>1.17.7</byte-buddy.version>
+        <!--
+            Wartosc domyslna dla argLine JaCoCo. Nadpisywana przez prepare-agent;
+            pusta wartosc pozwala zbudowac projekt takze z -Djacoco.skip=true,
+            gdy prepare-agent w ogole nie ustawi tej wlasciwosci.
+        -->
+        <jacocoArgLine></jacocoArgLine>
         <!-- SonarQube -->
         <sonar.projectKey>loyalty-club</sonar.projectKey>
         <sonar.host.url>http://192.168.100.150:9000</sonar.host.url>
@@ -75,6 +95,16 @@
             <version>0.12.6</version>
             <scope>runtime</scope>
         </dependency>
+        <!--
+            Specyfikacja OpenAPI generowana z kodu. Odblokowuje generowanie SDK
+            (w tym w C#), testy kontraktowe i wykrywanie rozjazdu miedzy kontraktem
+            a biblioteka klienta w czasie budowania, a nie dopiero w czasie dzialania.
+        -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
@@ -89,6 +119,26 @@
 
     <build>
         <plugins>
+            <!--
+                Sciezka procesorow adnotacji podana jawnie. Od JDK 23 javac nie
+                uruchamia procesorow znalezionych na sciezce klas, wiec bez tej
+                konfiguracji Lombok przestaje generowac kod przy budowaniu nowszym
+                zestawem narzedzi; bledy wygladaja wtedy jak brakujace metody
+                w kodzie, nie jak problem z konfiguracja budowania.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
@@ -101,14 +151,35 @@
                     </excludes>
                 </configuration>
             </plugin>
+            <!--
+                Mockito dolacza agenta Byte Buddy w trakcie dzialania JVM.
+                Od JDK 21 takie doladowanie wypisuje ostrzezenie, a docelowo
+                ma byc domyslnie zabronione; flaga wlacza je swiadomie.
+                @{jacocoArgLine} dokleja agenta pokrycia, ktory bez tego
+                zostalby nadpisany przez wlasne argLine.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>@{jacocoArgLine} -XX:+EnableDynamicAgentLoading</argLine>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.11</version>
+                <!--
+                    0.8.11 nie zna formatu plikow klas z JDK 25 i wysypuje sie
+                    przy instrumentacji klas mockow generowanych w locie.
+                -->
+                <version>0.8.15</version>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>
                         <goals><goal>prepare-agent</goal></goals>
+                        <configuration>
+                            <propertyName>jacocoArgLine</propertyName>
+                        </configuration>
                     </execution>
                     <execution>
                         <id>report</id>
@@ -124,247 +195,5 @@
             </plugin>
         </plugins>
     </build>
-
-    <profiles>
-        <profile>
-            <id>build-backend</id>
-        </profile>
-
-        <profile>
-            <id>build-frontend</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>com.github.eirslett</groupId>
-                        <artifactId>frontend-maven-plugin</artifactId>
-                        <version>${frontend-maven-plugin.version}</version>
-                        <configuration>
-                            <workingDirectory>${frontend.workingDirectory}</workingDirectory>
-                            <installDirectory>${frontend.installDirectory}</installDirectory>
-                        </configuration>
-                        <executions>
-                            <execution>
-                                <id>install-node-and-npm</id>
-                                <phase>generate-resources</phase>
-                                <goals>
-                                    <goal>install-node-and-npm</goal>
-                                </goals>
-                                <configuration>
-                                    <nodeVersion>v20.19.0</nodeVersion>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>npm-ci</id>
-                                <phase>generate-resources</phase>
-                                <goals>
-                                    <goal>npm</goal>
-                                </goals>
-                                <configuration>
-                                    <arguments>ci</arguments>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>npm-test</id>
-                                <phase>test</phase>
-                                <goals>
-                                    <goal>npm</goal>
-                                </goals>
-                                <configuration>
-                                    <arguments>run test</arguments>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>npm-build</id>
-                                <phase>prepare-package</phase>
-                                <goals>
-                                    <goal>npm</goal>
-                                </goals>
-                                <configuration>
-                                    <arguments>run build</arguments>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-
-                    <plugin>
-                        <artifactId>maven-antrun-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>clean-generated-frontend-static</id>
-                                <phase>prepare-package</phase>
-                                <goals>
-                                    <goal>run</goal>
-                                </goals>
-                                <configuration>
-                                    <target>
-                                        <delete dir="${frontend.resourcesDirectory}"/>
-                                        <mkdir dir="${frontend.resourcesDirectory}"/>
-                                    </target>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-
-                    <plugin>
-                        <artifactId>maven-resources-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>copy-frontend-dist-to-resources-static</id>
-                                <phase>prepare-package</phase>
-                                <goals>
-                                    <goal>copy-resources</goal>
-                                </goals>
-                                <configuration>
-                                    <outputDirectory>${frontend.resourcesDirectory}</outputDirectory>
-                                    <resources>
-                                        <resource>
-                                            <directory>${frontend.workingDirectory}/dist</directory>
-                                            <filtering>false</filtering>
-                                        </resource>
-                                    </resources>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>copy-frontend-dist-to-target-static</id>
-                                <phase>prepare-package</phase>
-                                <goals>
-                                    <goal>copy-resources</goal>
-                                </goals>
-                                <configuration>
-                                    <outputDirectory>${project.build.outputDirectory}/static</outputDirectory>
-                                    <resources>
-                                        <resource>
-                                            <directory>${frontend.resourcesDirectory}</directory>
-                                            <filtering>false</filtering>
-                                        </resource>
-                                    </resources>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-        <profile>
-            <!--
-                Profil e2e: uruchamia pelny stack i testy Playwright.
-                Kolejnosc: docker-compose-up, npm-install, playwright-install-chromium,
-                spring-boot-start, playwright-test, spring-boot-stop.
-                Uzycie: mvn verify -P build-frontend,e2e -DskipTests
-            -->
-            <id>e2e</id>
-            <build>
-                <plugins>
-
-                    <!-- ① Uruchom PostgreSQL przez Docker Compose -->
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>exec-maven-plugin</artifactId>
-                        <version>3.1.1</version>
-                        <executions>
-                            <execution>
-                                <id>e2e-docker-compose-up</id>
-                                <phase>pre-integration-test</phase>
-                                <goals><goal>exec</goal></goals>
-                                <configuration>
-                                    <executable>docker</executable>
-                                    <arguments>
-                                        <argument>compose</argument>
-                                        <argument>up</argument>
-                                        <argument>-d</argument>
-                                        <argument>--wait</argument>
-                                    </arguments>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-
-                    <!-- ② Playwright: zainstaluj Node, npm i przeglądarkę PRZED startem backendu -->
-                    <plugin>
-                        <groupId>com.github.eirslett</groupId>
-                        <artifactId>frontend-maven-plugin</artifactId>
-                        <version>${frontend-maven-plugin.version}</version>
-                        <configuration>
-                            <workingDirectory>e2e</workingDirectory>
-                            <installDirectory>target</installDirectory>
-                        </configuration>
-                        <executions>
-                            <execution>
-                                <id>e2e-install-node</id>
-                                <phase>pre-integration-test</phase>
-                                <goals><goal>install-node-and-npm</goal></goals>
-                                <configuration><nodeVersion>v20.19.0</nodeVersion></configuration>
-                            </execution>
-                            <execution>
-                                <id>e2e-npm-install</id>
-                                <phase>pre-integration-test</phase>
-                                <goals><goal>npm</goal></goals>
-                                <configuration><arguments>install</arguments></configuration>
-                            </execution>
-                            <execution>
-                                <id>e2e-playwright-install-browsers</id>
-                                <phase>pre-integration-test</phase>
-                                <goals><goal>npx</goal></goals>
-                                <configuration>
-                                    <arguments>playwright install --with-deps chromium</arguments>
-                                </configuration>
-                            </execution>
-
-                            <!-- ④ Uruchom testy E2E -->
-                            <execution>
-                                <id>e2e-playwright-test</id>
-                                <phase>integration-test</phase>
-                                <goals><goal>npx</goal></goals>
-                                <configuration>
-                                    <arguments>playwright test</arguments>
-                                    <environmentVariables>
-                                        <PLAYWRIGHT_HEADED>${playwright.headed}</PLAYWRIGHT_HEADED>
-                                    </environmentVariables>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-
-                    <!-- ③ Uruchom Spring Boot (blokuje do startu na porcie 8089) -->
-                    <plugin>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>e2e-start</id>
-                                <phase>pre-integration-test</phase>
-                                <goals><goal>start</goal></goals>
-                                <configuration>
-                                    <!-- Odpytuje port 8089 co 1s, maks. 60 prób (60s) -->
-                                    <wait>1000</wait>
-                                    <maxAttempts>60</maxAttempts>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>e2e-stop</id>
-                                <phase>post-integration-test</phase>
-                                <goals><goal>stop</goal></goals>
-                            </execution>
-                        </executions>
-                    </plugin>
-
-                </plugins>
-            </build>
-            <properties>
-                <!-- Domyslnie headless; nadpisywane przez profil e2e-display -->
-                <playwright.headed></playwright.headed>
-            </properties>
-        </profile>
-
-        <profile>
-            <!-- Overlay dla profilu e2e: uruchamia testy z widoczna przegladarka.
-                 Uzycie: mvn verify -P e2e,e2e-display -DskipTests -->
-            <id>e2e-display</id>
-            <properties>
-                <playwright.headed>true</playwright.headed>
-            </properties>
-        </profile>
-
-    </profiles>
 
 </project>

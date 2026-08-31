@@ -1,3 +1,9 @@
 # Project exclude paths
 /target/
-/src/main/resources/static/
+
+# Lokalne repozytorium Mavena (${user.dir}/.m2 z .mvn-settings.xml) - cache
+# budowania, nie zrodlo. Odtwarzane przez Mavena z Centrala.
+/.m2/
+
+# Ustawienia IDE
+/.idea/

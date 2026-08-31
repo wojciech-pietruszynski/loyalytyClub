@@ -10,6 +10,7 @@ import pl.pietruszynski.loyaltyclub.api.admin.repository.CouponTemplateRepositor
 import pl.pietruszynski.loyaltyclub.api.admin.repository.CustomerCouponRepository;
 import pl.pietruszynski.loyaltyclub.api.admin.repository.CustomerRepository;
 import pl.pietruszynski.loyaltyclub.api.admin.repository.TransactionRepository;
+import pl.pietruszynski.loyaltyclub.api.admin.service.CustomerPointsService;
 import pl.pietruszynski.loyaltyclub.api.coupon.dto.CouponRedeemRequest;
 import pl.pietruszynski.loyaltyclub.api.coupon.dto.CouponRedeemResponse;
 import pl.pietruszynski.loyaltyclub.api.coupon.dto.CouponValidationResponse;
@@ -37,6 +38,7 @@ class CouponServiceTest {
     @Mock private CustomerCouponRepository customerCouponRepository;
     @Mock private TransactionRepository transactionRepository;
     @Mock private CouponRedemptionRequestRepository couponRedemptionRequestRepository;
+    @Mock private CustomerPointsService customerPointsService;
 
     @InjectMocks
     private CouponService couponService;
@@ -169,7 +171,6 @@ class CouponServiceTest {
         });
         when(customerRepository.findByCustomerNumberForUpdate("C001")).thenReturn(Optional.of(customer));
         when(couponTemplateRepository.findById(1L)).thenReturn(Optional.of(template));
-        when(customerRepository.save(any())).thenReturn(customer);
         when(transactionRepository.save(any())).thenReturn(null);
         when(customerCouponRepository.save(any())).thenAnswer(inv -> {
             CustomerCoupon cc = inv.getArgument(0);
@@ -180,9 +181,11 @@ class CouponServiceTest {
 
         CouponRedeemResponse response = couponService.redeemPointsForCoupon(request, "IDEM-001");
 
-        assertThat(customer.getLoyaltyPoints()).isEqualTo(100);
         assertThat(response.status()).isEqualTo(CouponStatus.ACTIVE.name());
-        verify(transactionRepository).save(any(Transaction.class));
+        // Wymiana punktow nie jest korekta reczna i nie moze obnizac dorobku uczestnika.
+        verify(transactionRepository).save(argThat(t -> t.getPoints() == -100
+                && t.getType() == TransactionType.POINTS_REDEMPTION));
+        verify(customerPointsService).refresh(customer);
     }
 
     @Test
@@ -424,7 +427,6 @@ class CouponServiceTest {
         });
         when(customerRepository.findByCustomerNumberForUpdate("C001")).thenReturn(Optional.of(customer));
         when(couponTemplateRepository.findById(1L)).thenReturn(Optional.of(template));
-        when(customerRepository.save(any())).thenReturn(customer);
         when(transactionRepository.save(any())).thenReturn(null);
 
         DataIntegrityViolationException couponCodeCollision = new DataIntegrityViolationException("coupon_code constraint");
@@ -459,7 +461,6 @@ class CouponServiceTest {
         });
         when(customerRepository.findByCustomerNumberForUpdate("C001")).thenReturn(Optional.of(customer));
         when(couponTemplateRepository.findById(1L)).thenReturn(Optional.of(template));
-        when(customerRepository.save(any())).thenReturn(customer);
         when(transactionRepository.save(any())).thenReturn(null);
 
         DataIntegrityViolationException otherConstraint = new DataIntegrityViolationException("some_other_constraint violation");
@@ -519,5 +520,54 @@ class CouponServiceTest {
         CustomerCoupon cc = activeCoupon(code, customer, expiresAt);
         cc.setStatus(CouponStatus.USED);
         return cc;
+    }
+
+    /**
+     * Stan kuponu wyliczamy z dat przy kazdym odczycie. Kupon, ktorego nikt nie
+     * probowal uzyc, jest raportowany jako wygasly mimo utrwalonego stanu ACTIVE.
+     */
+    @Test
+    void validateCoupon_lapsedButPersistedActive_shouldReportExpired() {
+        Customer customer = customer("C001", "PL", 200);
+        CustomerCoupon coupon = activeCoupon("BONUS00000000099", customer, LocalDateTime.now().minusDays(1));
+        coupon.setStatus(CouponStatus.ACTIVE);
+
+        when(customerRepository.findByCustomerNumber("C001")).thenReturn(Optional.of(customer));
+        when(customerCouponRepository.findByCouponCode("BONUS00000000099")).thenReturn(Optional.of(coupon));
+        when(customerCouponRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        CouponValidationResponse response = couponService.validateCoupon("BONUS00000000099", "C001");
+
+        assertThat(response.status()).isEqualTo(CouponValidationStatus.COUPON_EXPIRED);
+        assertThat(coupon.getStatus()).isEqualTo(CouponStatus.EXPIRED);
+    }
+
+    /** Kupon wycofany przez operatora nie jest ani wazny, ani zrealizowany. */
+    @Test
+    void validateCoupon_cancelledCoupon_shouldReportCancelled() {
+        Customer customer = customer("C001", "PL", 200);
+        CustomerCoupon coupon = activeCoupon("BONUS00000000098", customer, LocalDateTime.now().plusDays(10));
+        coupon.setStatus(CouponStatus.CANCELLED);
+
+        when(customerRepository.findByCustomerNumber("C001")).thenReturn(Optional.of(customer));
+        when(customerCouponRepository.findByCouponCode("BONUS00000000098")).thenReturn(Optional.of(coupon));
+
+        CouponValidationResponse response = couponService.validateCoupon("BONUS00000000098", "C001");
+
+        assertThat(response.status()).isEqualTo(CouponValidationStatus.COUPON_CANCELLED);
+    }
+
+    @Test
+    void validateCoupon_inactiveCustomer_shouldReportCustomerNotActive() {
+        Customer customer = customer("C001", "PL", 200);
+        customer.setStatus(CustomerStatus.INACTIVE);
+        CustomerCoupon coupon = activeCoupon("BONUS00000000097", customer, LocalDateTime.now().plusDays(10));
+
+        when(customerRepository.findByCustomerNumber("C001")).thenReturn(Optional.of(customer));
+        when(customerCouponRepository.findByCouponCode("BONUS00000000097")).thenReturn(Optional.of(coupon));
+
+        CouponValidationResponse response = couponService.validateCoupon("BONUS00000000097", "C001");
+
+        assertThat(response.status()).isEqualTo(CouponValidationStatus.CUSTOMER_NOT_ACTIVE);
     }
 }

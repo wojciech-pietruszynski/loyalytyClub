@@ -15,6 +15,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import pl.pietruszynski.loyaltyclub.api.ecom.security.EcomUserDetailsService;
 import pl.pietruszynski.loyaltyclub.api.store.security.StoreUserDetailsService;
+import pl.pietruszynski.loyaltyclub.security.TokenRevocationService;
+
+import java.time.LocalDateTime;
 
 import java.util.List;
 
@@ -29,6 +32,7 @@ class JwtAuthFilterTest {
     @Mock private AdminUserDetailsService adminUserDetailsService;
     @Mock private StoreUserDetailsService storeUserDetailsService;
     @Mock private EcomUserDetailsService ecomUserDetailsService;
+    @Mock private TokenRevocationService tokenRevocationService;
     @Mock private HttpServletRequest request;
     @Mock private HttpServletResponse response;
     @Mock private FilterChain filterChain;
@@ -225,5 +229,26 @@ class JwtAuthFilterTest {
         verify(filterChain).doFilter(request, response);
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
         SecurityContextHolder.clearContext();
+    }
+
+    /**
+     * Token wycofany wylogowaniem albo zmiana hasla nie moze juz uwierzytelniac,
+     * mimo ze jego podpis i data waznosci sa nadal poprawne.
+     */
+    @Test
+    void doFilterInternal_revokedToken_shouldNotSetAuthentication() throws Exception {
+        SecurityContextHolder.clearContext();
+
+        when(request.getHeader("Authorization")).thenReturn("Bearer revoked-jwt");
+        when(jwtService.extractUsername("revoked-jwt")).thenReturn("admin");
+        when(jwtService.extractTokenId("revoked-jwt")).thenReturn("token-id");
+        when(jwtService.extractIssuedAt("revoked-jwt")).thenReturn(LocalDateTime.now());
+        when(tokenRevocationService.isRevoked(eq("token-id"), eq("admin"), any())).thenReturn(true);
+
+        jwtAuthFilter.doFilterInternal(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
+        verify(adminUserDetailsService, never()).loadUserByUsername(any());
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
     }
 }

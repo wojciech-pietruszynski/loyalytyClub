@@ -17,10 +17,10 @@ pipeline {
             }
         }
 
-        stage('Testy jednostkowe (Backend)') {
+        stage('Testy jednostkowe') {
             steps {
                 echo '==== Uruchamiam testy jednostkowe backendu ===='
-                sh 'mvn test -P build-backend'
+                sh 'mvn test'
             }
             post {
                 always {
@@ -38,10 +38,10 @@ pipeline {
             }
         }
 
-        stage('Budowanie Fullstack (Maven)') {
+        stage('Budowanie Backendu (Maven)') {
             steps {
-                echo '==== Rozpoczynam budowanie z profilem build-frontend ===='
-                sh 'mvn clean package -P build-frontend -DskipTests'
+                echo '==== Rozpoczynam budowanie JAR-a backendu ===='
+                sh 'mvn clean package -DskipTests'
             }
         }
 

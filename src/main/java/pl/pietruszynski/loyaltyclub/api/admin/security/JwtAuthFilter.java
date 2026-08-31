@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import pl.pietruszynski.loyaltyclub.api.ecom.security.EcomUserDetailsService;
 import pl.pietruszynski.loyaltyclub.api.store.security.StoreUserDetailsService;
+import pl.pietruszynski.loyaltyclub.security.TokenRevocationService;
 
 import java.io.IOException;
 
@@ -25,6 +26,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private final AdminUserDetailsService adminUserDetailsService;
     private final StoreUserDetailsService storeUserDetailsService;
     private final EcomUserDetailsService ecomUserDetailsService;
+    private final TokenRevocationService tokenRevocationService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -41,7 +43,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             String username = jwtService.extractUsername(jwt);
             String role = jwtService.extractRole(jwt);
 
-            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            boolean revoked = tokenRevocationService.isRevoked(
+                    jwtService.extractTokenId(jwt), username, jwtService.extractIssuedAt(jwt));
+
+            if (username != null && !revoked && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = loadUserDetails(username, role);
                 if (jwtService.isTokenValid(jwt, userDetails)) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(

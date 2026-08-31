@@ -16,6 +16,7 @@ import pl.pietruszynski.loyaltyclub.api.admin.model.*;
 import pl.pietruszynski.loyaltyclub.api.admin.security.AdminUserDetailsService;
 import pl.pietruszynski.loyaltyclub.api.admin.security.JwtService;
 import org.junit.jupiter.api.BeforeEach;
+import pl.pietruszynski.loyaltyclub.api.admin.service.CustomerPrivacyService;
 import pl.pietruszynski.loyaltyclub.api.admin.service.LoyaltyService;
 import pl.pietruszynski.loyaltyclub.api.admin.service.LoyaltyTierService;
 import pl.pietruszynski.loyaltyclub.api.admin.service.TechnicalUserService;
@@ -24,6 +25,7 @@ import pl.pietruszynski.loyaltyclub.api.store.model.HierarchyPromotion;
 import pl.pietruszynski.loyaltyclub.api.store.model.HierarchyPromotionType;
 import pl.pietruszynski.loyaltyclub.api.store.model.StorePointsPromotion;
 import pl.pietruszynski.loyaltyclub.api.store.security.StoreUserDetailsService;
+import pl.pietruszynski.loyaltyclub.security.TokenRevocationService;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -31,6 +33,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -43,18 +46,21 @@ class LoyaltyControllerTest {
 
     @BeforeEach
     void stubTier() {
-        when(loyaltyTierService.resolveTierCode(anyInt())).thenReturn("BRONZE");
+        // Poziom wynika teraz z dorobku punktowego uczestnika, nie z biezacego salda.
+        lenient().when(loyaltyTierService.resolveTierCode(any(Customer.class))).thenReturn("BRONZE");
     }
 
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
     @MockBean LoyaltyService loyaltyService;
+    @MockBean CustomerPrivacyService customerPrivacyService;
     @MockBean LoyaltyTierService loyaltyTierService;
     @MockBean TechnicalUserService technicalUserService;
     @MockBean JwtService jwtService;
     @MockBean AdminUserDetailsService adminUserDetailsService;
     @MockBean StoreUserDetailsService storeUserDetailsService;
     @MockBean EcomUserDetailsService ecomUserDetailsService;
+    @MockBean TokenRevocationService tokenRevocationService;
 
     // -----------------------------------------------------------------------
     // GET /api/admin/customers
@@ -203,13 +209,31 @@ class LoyaltyControllerTest {
     // -----------------------------------------------------------------------
 
     @Test
-    void addPoints_shouldReturn200() throws Exception {
+    void addPoints_withIdempotencyKey_shouldReturn200() throws Exception {
+        PointsRequest req = new PointsRequest(50, "bonus");
+        when(loyaltyService.addPoints(eq(1L), eq(50), eq("bonus"), eq("key-1")))
+                .thenReturn(Transaction.builder().points(50).description("bonus").build());
+
+        mockMvc.perform(post("/api/admin/customers/1/add-points")
+                        .header("Idempotency-Key", "key-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.points").value(50));
+    }
+
+    /**
+     * Korekta reczna nie ma numeru dokumentu kasowego, wiec bez klucza idempotencji
+     * nic nie chronilo jej przed podwojnym wykonaniem. Klucz jest wymagany.
+     */
+    @Test
+    void addPoints_withoutIdempotencyKey_shouldReturn400() throws Exception {
         PointsRequest req = new PointsRequest(50, "bonus");
 
         mockMvc.perform(post("/api/admin/customers/1/add-points")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isOk());
+                .andExpect(status().isBadRequest());
     }
 
     // -----------------------------------------------------------------------
