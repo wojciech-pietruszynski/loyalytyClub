@@ -13,7 +13,13 @@ import java.time.LocalDateTime;
  * cyklicznego nie tworzy drugiego powiadomienia o tym samym.
  */
 @Entity
-@Table(name = "point_expiry_notifications")
+@Table(
+        name = "point_expiry_notifications",
+        // Ograniczenie zaklada migracja 017; powtorzone w mapowaniu, bo to na nim
+        // opiera sie odpornosc zadania cyklicznego na powtorny przebieg.
+        uniqueConstraints = @UniqueConstraint(
+                name = "uq_point_expiry_notifications",
+                columnNames = {"transaction_id", "notice_days"}))
 @Getter
 @Setter
 @NoArgsConstructor

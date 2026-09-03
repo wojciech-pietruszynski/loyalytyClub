@@ -1,0 +1,70 @@
+@startuml
+!pragma layout smetana
+skinparam dpi 96
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam classFontSize 12
+skinparam classAttributeFontSize 10
+skinparam ArrowColor #546E7A
+skinparam classBorderColor #37474F
+skinparam classBackgroundColor #FFFFFF
+skinparam packageBorderColor #90A4AE
+skinparam packageBackgroundColor #FAFAFA
+skinparam packageFontSize 13
+skinparam packageFontStyle bold
+skinparam nodesep 22
+skinparam ranksep 40
+hide empty members
+
+package "api.admin.audit" {
+  class AdminAuditLog #FFFFFF {
+    - id : Long
+    - occurredAt : LocalDateTime
+    - username : String
+    - role : String
+    - action : String
+    - resourceType : String
+    - resourceId : String
+    + onCreate() : void
+  }
+  interface AdminAuditLogRepository #E8F5E9 {
+  }
+  class AuditAspect #EDE7F6 {
+    - PATH_ID_PARAMETER : String
+    - adminAuditLogRepository : AdminAuditLogRepository
+    + recordSuccessfulAction() : void
+  }
+  class AuditService #EDE7F6 {
+    - adminAuditLogRepository : AdminAuditLogRepository
+    + getLatestLogs() : List<AdminAuditLogDto>
+  }
+}
+package "api.admin.config" {
+  class AdminUserSeeder #ECEFF1 {
+    - adminUserRepository : AdminUserRepository
+    - passwordEncoder : PasswordEncoder
+    + run() : void
+  }
+  class CouponPrefixSeeder #ECEFF1 {
+    - couponPrefixRepository : CouponPrefixRepository
+    + run() : void
+  }
+  class CouponTemplateSeeder #ECEFF1 {
+    - couponTemplateRepository : CouponTemplateRepository
+    + run() : void
+  }
+}
+package "powiazania spoza tej strony" #F0F0F0 {
+  class AdminUserRepository #F0F0F0
+  class AuditController #F0F0F0
+  class CouponPrefixRepository #F0F0F0
+  class CouponTemplateRepository #F0F0F0
+}
+AdminUserSeeder --> AdminUserRepository
+AuditAspect --> AdminAuditLogRepository
+AuditController --> AuditService
+AuditService --> AdminAuditLogRepository
+CouponPrefixSeeder --> CouponPrefixRepository
+CouponTemplateSeeder --> CouponTemplateRepository
+@enduml

@@ -1,0 +1,216 @@
+@startuml
+!pragma layout smetana
+skinparam dpi 96
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam classFontSize 12
+skinparam classAttributeFontSize 10
+skinparam ArrowColor #546E7A
+skinparam classBorderColor #37474F
+skinparam classBackgroundColor #FFFFFF
+skinparam packageBorderColor #90A4AE
+skinparam packageBackgroundColor #FAFAFA
+skinparam packageFontSize 13
+skinparam packageFontStyle bold
+skinparam nodesep 22
+skinparam ranksep 40
+hide empty members
+
+package "api.admin.controller" {
+  class AuditController #FFE0E6 {
+    - auditService : AuditService
+    + getLogs() : List<AdminAuditLogDto>
+  }
+  class AuthController #FFE0E6 {
+    - ROLE_TECHNICAL : String
+    - authenticationTokenService : AuthenticationTokenService
+    - accountService : AccountService
+    - technicalUserRepository : TechnicalUserRepository
+    + login() : ResponseEntity<LoginResponse>
+    + refresh() : ResponseEntity<LoginResponse>
+    + logout() : ResponseEntity<Void>
+    + changePassword() : ResponseEntity<Void>
+  }
+  class LoyaltyController #FFE0E6 {
+    - loyaltyService : LoyaltyService
+    - customerPrivacyService : CustomerPrivacyService
+    - technicalUserService : TechnicalUserService
+    - loyaltyTierService : LoyaltyTierService
+    + getAllCustomers() : List<CustomerDto>
+    + getCustomersPage() : PageResponse<CustomerDto>
+    + getAvailableCountries() : List<String>
+    + getCouponPrefixes() : List<String>
+    + getStorePromotions() : List<StorePromotionDto>
+    + createStorePromotion() : StorePromotionDto
+    + updateStorePromotion() : StorePromotionDto
+    + setStorePromotionStatus() : StorePromotionDto
+    + createCustomer() : CustomerDto
+    + getCustomer() : CustomerDto
+    + updateCustomer() : CustomerDto
+    + setCustomerStatus() : CustomerDto
+    + exportPersonalData() : PersonalDataExportDto
+    + anonymizeCustomer() : CustomerDto
+  }
+  class ReportController #FFE0E6 {
+    - TEXT_CSV : MediaType
+    - EXPORT_MIN_DATE : LocalDate
+    - reportService : ReportService
+    - technicalUserService : TechnicalUserService
+    + getSummary() : ReportsSummaryDto
+    + getExpiringPoints() : List<ExpiringPointsDto>
+    + exportCustomers() : ResponseEntity<byte[]>
+    + exportTransactions() : ResponseEntity<byte[]>
+  }
+  class TechnicalUserController #FFE0E6 {
+    - technicalUserService : TechnicalUserService
+    + getTechnicalUsers() : List<TechnicalUserDto>
+    + createTechnicalUser() : TechnicalUserDto
+    + setTechnicalUserStatus() : TechnicalUserDto
+    + updateTechnicalUserPassword() : TechnicalUserDto
+    + resetTechnicalUserPassword() : TechnicalUserDto
+  }
+}
+package "api.admin.security" {
+  class AdminUserDetailsService #EDE7F6 {
+    - adminUserRepository : AdminUserRepository
+    - technicalUserRepository : TechnicalUserRepository
+    + loadUserByUsername() : UserDetails
+  }
+  class JwtAuthFilter #ECEFF1 {
+    - jwtService : JwtService
+    - adminUserDetailsService : AdminUserDetailsService
+    - storeUserDetailsService : StoreUserDetailsService
+    - ecomUserDetailsService : EcomUserDetailsService
+    - tokenRevocationService : TokenRevocationService
+    + doFilterInternal() : void
+  }
+  class JwtService #EDE7F6 {
+    - jwtSecret : String
+    - jwtExpirationMs : long
+    + generateToken() : String
+    + generateToken() : String
+    + extractUsername() : String
+    + extractTokenId() : String
+    + extractExpirationEpochMillis() : long
+    + extractExpiration() : LocalDateTime
+    + extractIssuedAt() : LocalDateTime
+    + extractRole() : String
+    + getExpirationMs() : long
+    + isTokenValid() : boolean
+  }
+}
+package "api.admin.service" {
+  class AccountService #EDE7F6 {
+    - adminUserRepository : AdminUserRepository
+    - technicalUserRepository : TechnicalUserRepository
+    - passwordEncoder : PasswordEncoder
+    - tokenRevocationService : TokenRevocationService
+    + changeOwnPassword() : void
+  }
+  class CustomerPointsService #EDE7F6 {
+    - customerRepository : CustomerRepository
+    - transactionRepository : TransactionRepository
+    + refresh() : List<Transaction>
+    + resolveState() : TransactionState
+  }
+  class CustomerPrivacyService #EDE7F6 {
+    - ANONYMIZED_VALUE : String
+    - ANONYMIZED_PHONE : String
+    - customerRepository : CustomerRepository
+    - loyaltyService : LoyaltyService
+    - loyaltyTierService : LoyaltyTierService
+    + exportPersonalData() : PersonalDataExportDto
+    + anonymize() : Customer
+  }
+  class LoyaltyService #EDE7F6 {
+    - COUNTRY_NOT_ALLOWED : String
+    - ADD_POINTS_OPERATION : String
+    - couponCodeGenerator : CouponCodeGenerator
+    - referralCodeGenerator : ReferralCodeGenerator
+    - customerRepository : CustomerRepository
+    - transactionRepository : TransactionRepository
+    - couponTemplateRepository : CouponTemplateRepository
+    - couponPrefixRepository : CouponPrefixRepository
+    - customerCouponRepository : CustomerCouponRepository
+    - storePointsPromotionRepository : StorePointsPromotionRepository
+    - hierarchyPromotionRepository : HierarchyPromotionRepository
+    - customerPointsService : CustomerPointsService
+    - referralRewardService : ReferralRewardService
+    - idempotencyService : IdempotencyService
+    - availableCountryCodesConfig : String
+    + getAllCustomers() : List<Customer>
+    + getAllCustomers() : List<Customer>
+    + searchCustomers() : Page<Customer>
+    + getCustomerById() : Customer
+    + getCustomerById() : Customer
+    + createCustomer() : Customer
+    + createCustomer() : Customer
+    + createCustomer() : Customer
+    + updateCustomer() : Customer
+    + updateCustomer() : Customer
+    + setCustomerStatus() : Customer
+    + getAvailableCountryCodes() : List<String>
+    + getAvailableCountryCodes() : List<String>
+    + getIssuedCoupons() : List<CustomerCoupon>
+  }
+  class LoyaltyTierService #EDE7F6 {
+    - loyaltyTierRepository : LoyaltyTierRepository
+    + resolveTierCode() : String
+    + resolveTierCode() : String
+    + getTiers() : List<LoyaltyTier>
+  }
+  class ReferralRewardService #EDE7F6 {
+    - referralRewardRepository : ReferralRewardRepository
+    - transactionRepository : TransactionRepository
+    - customerPointsService : CustomerPointsService
+    - referralProperties : ReferralProperties
+    + awardIfEligible() : Optional<ReferralReward>
+    + getRewardsGrantedTo() : List<ReferralReward>
+  }
+  class ReportService #EDE7F6 {
+    - SUMMARY_WINDOW_DAYS : int
+    - IMMEDIATE_TYPES : List<TransactionType>
+    - CUSTOMERS_CSV_HEADER : String
+    - TRANSACTIONS_CSV_HEADER : String
+    - customerRepository : CustomerRepository
+    - transactionRepository : TransactionRepository
+    - loyaltyTierService : LoyaltyTierService
+    - pointExpiryNotificationService : PointExpiryNotificationService
+    + getSummary() : ReportsSummaryDto
+    + getExpiringPoints() : List<ExpiringPointsDto>
+    + exportCustomersCsv() : String
+    + exportTransactionsCsv() : String
+  }
+  class TechnicalUserService #EDE7F6 {
+    - technicalUserRepository : TechnicalUserRepository
+    - passwordEncoder : PasswordEncoder
+    - passwordGenerator : PasswordGenerator
+    - tokenRevocationService : TokenRevocationService
+    - availableCountryCodesConfig : String
+    + getAllTechnicalUsers() : List<TechnicalUser>
+    + createTechnicalUser() : TechnicalUserWithPassword
+    + setTechnicalUserEnabled() : TechnicalUser
+    + updateTechnicalUserPassword() : TechnicalUser
+    + resetTechnicalUserPassword() : TechnicalUserWithPassword
+    + resolveTechnicalUserCountry() : String
+    + TechnicalUserWithPassword() : record
+  }
+}
+AuthController --> AccountService
+CustomerPrivacyService --> LoyaltyService
+CustomerPrivacyService --> LoyaltyTierService
+JwtAuthFilter --> AdminUserDetailsService
+JwtAuthFilter --> JwtService
+LoyaltyController --> CustomerPrivacyService
+LoyaltyController --> LoyaltyService
+LoyaltyController --> LoyaltyTierService
+LoyaltyController --> TechnicalUserService
+LoyaltyService --> CustomerPointsService
+LoyaltyService --> ReferralRewardService
+ReferralRewardService --> CustomerPointsService
+ReportController --> ReportService
+ReportController --> TechnicalUserService
+ReportService --> LoyaltyTierService
+TechnicalUserController --> TechnicalUserService
+@enduml

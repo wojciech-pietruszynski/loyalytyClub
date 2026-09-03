@@ -1,16 +1,74 @@
-version: '3.8'
+# Warstwa serwerowa LoyaltyClub: baza + backend.
+#
+# Siec "loyaltyclub-net" powstaje razem z tym plikiem i jest dolaczana przez
+# repozytorium frontendu jako siec zewnetrzna. Dzieki temu oba wdrozenia
+# zostaja niezalezne, a kontenery widza sie po nazwach uslug.
+# Kolejnosc uruchamiania: najpierw ten plik, potem compose frontendu.
+#
+#   docker compose up -d --build        (albo scripts/stack.ps1 up)
+
+name: loyaltyclub-backend
+
 services:
   db:
+    # Bez container_name - backend siega do bazy po nazwie uslugi ("db"),
+    # ktora rozwiazuje DNS Dockera wewnatrz sieci. Stala nazwa kontenera
+    # tylko kolidowalaby z innymi wdrozeniami tego projektu na tym hoscie.
     image: postgres:15
-    container_name: loyalty-db
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: loyalty_db
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ${POSTGRES_DB:-loyalty_db}
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
     ports:
-      - "5433:5432"
+      # Wystawiony na hosta wylacznie dla narzedzi deweloperskich;
+      # backend laczy sie po sieci kontenerow, na porcie 5432.
+      - "${DB_HOST_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB:-loyalty_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+    networks:
+      - loyaltyclub
+
+  backend:
+    build:
+      context: .
+      target: runtime
+      args:
+        SKIP_TESTS: "true"
+    image: ${BACKEND_IMAGE:-loyaltyclub/backend}:${IMAGE_TAG:-local}
+    container_name: loyalty-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        # Liquibase startuje od razu przy podnoszeniu kontekstu, wiec baza
+        # musi byc gotowa, a nie tylko uruchomiona.
+        condition: service_healthy
+    environment:
+      # Nazwa hosta "db" pochodzi z nazwy uslugi - rozwiazuje ja DNS Dockera.
+      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-loyalty_db}
+      DB_USERNAME: ${POSTGRES_USER:-user}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      JWT_SECRET: ${JWT_SECRET:-YWRtaW5Mb3lhbHR5Q2x1YlNlY3JldEtleUFkbWluTG95YWx0eUNsdWJTZWNyZXRLZXk=}
+      # Puste = frontend i API pod jednym originem (nginx frontendu przekazuje
+      # /api dalej), wiec CORS nie jest potrzebny. Ustawiac tylko wtedy, gdy SPA
+      # stoi pod innym adresem niz API.
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75 -XX:+UseG1GC}
+    ports:
+      - "${BACKEND_HOST_PORT:-8089}:8089"
+    networks:
+      - loyaltyclub
 
 volumes:
   postgres_data:
+
+networks:
+  loyaltyclub:
+    # Stala nazwa (bez prefiksu projektu), zeby compose frontendu mogl
+    # wskazac te sama siec jako zewnetrzna.
+    name: loyaltyclub-net

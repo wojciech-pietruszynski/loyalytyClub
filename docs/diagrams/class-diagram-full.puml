@@ -1,0 +1,1231 @@
+@startuml
+!pragma layout smetana
+skinparam dpi 96
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam classFontSize 12
+skinparam classAttributeFontSize 10
+skinparam ArrowColor #546E7A
+skinparam classBorderColor #37474F
+skinparam classBackgroundColor #FFFFFF
+skinparam packageBorderColor #90A4AE
+skinparam packageBackgroundColor #FAFAFA
+skinparam packageFontSize 13
+skinparam packageFontStyle bold
+skinparam nodesep 22
+skinparam ranksep 40
+hide empty members
+
+package "(root)" {
+  class LoyaltyClubApplication #FFFFFF {
+    + main() : void
+  }
+}
+package "api.admin.audit" {
+  class AdminAuditLog #FFFFFF {
+    - id : Long
+    - occurredAt : LocalDateTime
+    - username : String
+    - role : String
+    - action : String
+    - resourceType : String
+    - resourceId : String
+    + onCreate() : void
+  }
+  interface AdminAuditLogRepository #E8F5E9 {
+  }
+  class AuditAspect #EDE7F6 {
+    - PATH_ID_PARAMETER : String
+    - adminAuditLogRepository : AdminAuditLogRepository
+    + recordSuccessfulAction() : void
+  }
+  class AuditService #EDE7F6 {
+    - adminAuditLogRepository : AdminAuditLogRepository
+    + getLatestLogs() : List<AdminAuditLogDto>
+  }
+}
+package "api.admin.config" {
+  class AdminUserSeeder #ECEFF1 {
+    - adminUserRepository : AdminUserRepository
+    - passwordEncoder : PasswordEncoder
+    + run() : void
+  }
+  class CouponPrefixSeeder #ECEFF1 {
+    - couponPrefixRepository : CouponPrefixRepository
+    + run() : void
+  }
+  class CouponTemplateSeeder #ECEFF1 {
+    - couponTemplateRepository : CouponTemplateRepository
+    + run() : void
+  }
+}
+package "api.admin.controller" {
+  class AuditController #FFE0E6 {
+    - auditService : AuditService
+    + getLogs() : List<AdminAuditLogDto>
+  }
+  class AuthController #FFE0E6 {
+    - ROLE_TECHNICAL : String
+    - authenticationTokenService : AuthenticationTokenService
+    - accountService : AccountService
+    - technicalUserRepository : TechnicalUserRepository
+    + login() : ResponseEntity<LoginResponse>
+    + refresh() : ResponseEntity<LoginResponse>
+    + logout() : ResponseEntity<Void>
+    + changePassword() : ResponseEntity<Void>
+  }
+  class LoyaltyController #FFE0E6 {
+    - loyaltyService : LoyaltyService
+    - customerPrivacyService : CustomerPrivacyService
+    - technicalUserService : TechnicalUserService
+    - loyaltyTierService : LoyaltyTierService
+    + getAllCustomers() : List<CustomerDto>
+    + getCustomersPage() : PageResponse<CustomerDto>
+    + getAvailableCountries() : List<String>
+    + getCouponPrefixes() : List<String>
+    + getStorePromotions() : List<StorePromotionDto>
+    + createStorePromotion() : StorePromotionDto
+    + updateStorePromotion() : StorePromotionDto
+    + setStorePromotionStatus() : StorePromotionDto
+    + createCustomer() : CustomerDto
+    + getCustomer() : CustomerDto
+    + updateCustomer() : CustomerDto
+    + setCustomerStatus() : CustomerDto
+    + exportPersonalData() : PersonalDataExportDto
+    + anonymizeCustomer() : CustomerDto
+  }
+  class ReportController #FFE0E6 {
+    - TEXT_CSV : MediaType
+    - EXPORT_MIN_DATE : LocalDate
+    - reportService : ReportService
+    - technicalUserService : TechnicalUserService
+    + getSummary() : ReportsSummaryDto
+    + getExpiringPoints() : List<ExpiringPointsDto>
+    + exportCustomers() : ResponseEntity<byte[]>
+    + exportTransactions() : ResponseEntity<byte[]>
+  }
+  class TechnicalUserController #FFE0E6 {
+    - technicalUserService : TechnicalUserService
+    + getTechnicalUsers() : List<TechnicalUserDto>
+    + createTechnicalUser() : TechnicalUserDto
+    + setTechnicalUserStatus() : TechnicalUserDto
+    + updateTechnicalUserPassword() : TechnicalUserDto
+    + resetTechnicalUserPassword() : TechnicalUserDto
+  }
+}
+package "api.admin.dto" {
+  class AdminAuditLogDto #E3F2FD {
+    - id : Long
+    - timestamp : LocalDateTime
+    - username : String
+    - role : String
+    - action : String
+    - resourceType : String
+    - resourceId : String
+  }
+  class ChangePasswordRequest #E3F2FD {
+    - currentPassword : String
+    - newPassword : String
+  }
+  class CouponIssueRequest #E3F2FD {
+    - customerId : Long
+    - couponTemplateId : Long
+    - reason : CouponReason
+  }
+  class CouponTemplateCreateRequest #E3F2FD {
+    - couponValue : BigDecimal
+    - minimumPurchaseValue : BigDecimal
+    - requiredPoints : Integer
+    - country : String
+    - validityDays : Integer
+    - couponPrefix : String
+  }
+  class CouponTemplateDto #E3F2FD {
+    - id : Long
+    - couponValue : BigDecimal
+    - minimumPurchaseValue : BigDecimal
+    - requiredPoints : Integer
+    - country : String
+    - validityDays : Integer
+    - couponPrefix : String
+  }
+  class CustomerCouponDto #E3F2FD {
+    - id : Long
+    - couponCode : String
+    - customerId : Long
+    - customerName : String
+    - country : String
+    - couponValue : BigDecimal
+    - minimumPurchaseValue : BigDecimal
+    - requiredPoints : Integer
+    - validityDays : Integer
+    - couponPrefix : String
+    - reason : String
+    - status : String
+    - issuedAt : LocalDateTime
+    - expiresAt : LocalDateTime
+  }
+  class CustomerDto #E3F2FD {
+    - id : Long
+    - firstName : String
+    - lastName : String
+    - email : String
+    - customerNumber : String
+    - phoneNumber : String
+    - country : String
+    - loyaltyPoints : Integer
+    - lifetimePoints : Integer
+    - status : String
+    - createdAt : LocalDateTime
+    - referrerCustomerNumber : String
+    - referralCode : String
+    - loyaltyTierCode : String
+  }
+  class CustomerStatusRequest #E3F2FD {
+    - status : CustomerStatus
+  }
+  class ExpiringPointsDto #E3F2FD {
+    - transactionId : Long
+    - customerId : Long
+    - customerNumber : String
+    - country : String
+    - points : Integer
+    - expiresAt : LocalDateTime
+  }
+  class HierarchyPromotionCreateRequest #E3F2FD {
+    - name : String
+    - country : String
+    - hierarchy : String
+    - productClass : String
+    - subclass : String
+    - type : HierarchyPromotionType
+    - multiplier : BigDecimal
+    - startsAt : LocalDateTime
+    - endsAt : LocalDateTime
+    - enabled : Boolean
+  }
+  class HierarchyPromotionDto #E3F2FD {
+    - id : Long
+    - name : String
+    - country : String
+    - hierarchy : String
+    - productClass : String
+    - subclass : String
+    - type : HierarchyPromotionType
+    - multiplier : BigDecimal
+    - startsAt : LocalDateTime
+    - endsAt : LocalDateTime
+    - enabled : boolean
+  }
+  class LoginRequest #E3F2FD {
+    - username : String
+    - password : String
+  }
+  class LoginResponse #E3F2FD {
+    - token : String
+    - expiresAt : long
+    - role : String
+    - country : String
+  }
+  class PersonalDataExportDto #E3F2FD {
+    - generatedAt : LocalDateTime
+    - profile : Profile
+    - transactions : List<TransactionEntry>
+    - coupons : List<CouponEntry>
+    - referrals : List<ReferralEntry>
+    + Profile() : record
+    + TransactionEntry() : record
+    + CouponEntry() : record
+    + ReferralEntry() : record
+  }
+  class PointsRequest #E3F2FD {
+    - points : Integer
+    - description : String
+  }
+  class PurchaseHistoryDto #E3F2FD {
+    - points : List<PurchaseHistoryPointDto>
+    - maxTotal : int
+  }
+  class PurchaseHistoryPointDto #E3F2FD {
+    - date : String
+    - total : int
+  }
+  class ReferralRewardDto #E3F2FD {
+    - id : Long
+    - referredCustomerId : Long
+    - referredCustomerNumber : String
+    - referredCustomerName : String
+    - referrerPoints : Integer
+    - referredPoints : Integer
+    - country : String
+    - awardedAt : LocalDateTime
+  }
+  class ReportsSummaryDto #E3F2FD {
+    - scope : String
+    - customerCount : long
+    - totalLoyaltyPoints : long
+    - transactionsLast30Days : long
+    - availablePoints : long
+    - pendingPoints : long
+    - expiredPoints : long
+    + of() : ReportsSummaryDto
+  }
+  class StorePromotionCreateRequest #E3F2FD {
+    - name : String
+    - country : String
+    - pointsPerCurrency : BigDecimal
+    - startsAt : LocalDateTime
+    - endsAt : LocalDateTime
+    - enabled : Boolean
+  }
+  class StorePromotionDto #E3F2FD {
+    - id : Long
+    - name : String
+    - country : String
+    - pointsPerCurrency : BigDecimal
+    - startsAt : LocalDateTime
+    - endsAt : LocalDateTime
+    - enabled : boolean
+  }
+  class StorePromotionStatusRequest #E3F2FD {
+    - enabled : Boolean
+  }
+  class TechnicalUserCreateRequest #E3F2FD {
+    - username : String
+    - password : String
+    - country : String
+    - enabled : Boolean
+  }
+  class TechnicalUserDto #E3F2FD {
+    - id : Long
+    - username : String
+    - country : String
+    - enabled : boolean
+    - passwordChangedAt : LocalDateTime
+    - oneTimePassword : String
+  }
+  class TechnicalUserPasswordRequest #E3F2FD {
+    - password : String
+  }
+  class TechnicalUserStatusRequest #E3F2FD {
+    - enabled : Boolean
+  }
+  class TransactionDto #E3F2FD {
+    - id : Long
+    - points : Integer
+    - description : String
+    - timestamp : LocalDateTime
+    - availableFrom : LocalDateTime
+    - type : String
+    - state : String
+    - amount : BigDecimal
+    - expiresAt : LocalDateTime
+  }
+}
+package "api.admin.model" {
+  class AdminUser #FFF3C4 {
+  }
+  class CouponPrefix #FFF3C4 {
+    - id : Long
+    - value : String
+  }
+  enum CouponReason #FFECB3 {
+    POINTS_EXCHANGE
+    COMPLAINT
+  }
+  enum CouponStatus #FFECB3 {
+    ACTIVE
+    USED
+    EXPIRED
+    CANCELLED
+    + isFinal() : boolean
+  }
+  class CouponTemplate #FFF3C4 {
+    - id : Long
+    - couponValue : BigDecimal
+    - minimumPurchaseValue : BigDecimal
+    - requiredPoints : Integer
+    - country : String
+    - validityDays : Integer
+    - couponPrefix : String
+  }
+  class Customer #FFF3C4 {
+    - id : Long
+    - firstName : String
+    - lastName : String
+    - email : String
+    - customerNumber : String
+    - phoneNumber : String
+    - country : String
+    - loyaltyPoints : Integer
+    - lifetimePoints : Integer
+    - status : CustomerStatus
+    - statusChangedAt : LocalDateTime
+    - createdAt : LocalDateTime
+    - referralCode : String
+    - referredBy : Customer
+    - transactions : List<Transaction>
+    + onCreate() : void
+  }
+  class CustomerCoupon #FFF3C4 {
+    - id : Long
+    - couponCode : String
+    - country : String
+    - customer : Customer
+    - couponTemplate : CouponTemplate
+    - reason : CouponReason
+    - status : CouponStatus
+    - issuedAt : LocalDateTime
+    - expiresAt : LocalDateTime
+    + effectiveStatus() : CouponStatus
+  }
+  enum CustomerStatus #FFECB3 {
+    ACTIVE
+    INACTIVE
+    ANONYMIZED
+    + allowsPointOperations() : boolean
+  }
+  class LoyaltyTier #FFF3C4 {
+    - id : Long
+    - code : String
+    - minPoints : Integer
+  }
+  class ReferralReward #FFF3C4 {
+    - id : Long
+    - referrer : Customer
+    - referred : Customer
+    - qualifyingTransaction : Transaction
+    - referrerTransaction : Transaction
+    - referredTransaction : Transaction
+    - referrerPoints : Integer
+    - referredPoints : Integer
+    - country : String
+    - awardedAt : LocalDateTime
+    + onCreate() : void
+  }
+  class TechnicalUser #FFF3C4 {
+    - id : Long
+    - username : String
+    - password : String
+    - passwordChangedAt : LocalDateTime
+    - country : String
+    - enabled : boolean
+    + onCreate() : void
+  }
+  class Transaction #FFF3C4 {
+    - id : Long
+    - customer : Customer
+    - points : Integer
+    - amount : BigDecimal
+    - pointsPerCurrency : BigDecimal
+    - description : String
+    - country : String
+    - type : TransactionType
+    - state : TransactionState
+    - sourceTransactionNumber : String
+    - purchaseTimestamp : LocalDateTime
+    - availableFrom : LocalDateTime
+    - expiresAt : LocalDateTime
+    - timestamp : LocalDateTime
+    - sourceTransaction : Transaction
+    + onCreate() : void
+  }
+  enum TransactionState #FFECB3 {
+    PENDING
+    AVAILABLE
+    EXPIRED
+  }
+  enum TransactionType #FFECB3 {
+    SALE
+    RETURN
+    MANUAL_ADJUSTMENT
+    REFERRAL
+    POINTS_REDEMPTION
+    POINTS_REFUND
+    + isImmediatelyAvailable() : boolean
+    + countsTowardsLifetimePoints() : boolean
+  }
+}
+package "api.admin.repository" {
+  interface AdminUserRepository #E8F5E9 {
+  }
+  interface CouponPrefixRepository #E8F5E9 {
+  }
+  interface CouponTemplateRepository #E8F5E9 {
+  }
+  interface CustomerCouponRepository #E8F5E9 {
+  }
+  interface CustomerRepository #E8F5E9 {
+  }
+  interface LoyaltyTierRepository #E8F5E9 {
+  }
+  interface ReferralRewardRepository #E8F5E9 {
+  }
+  interface TechnicalUserRepository #E8F5E9 {
+  }
+  interface TransactionRepository #E8F5E9 {
+  }
+}
+package "api.admin.security" {
+  class AdminUserDetailsService #EDE7F6 {
+    - adminUserRepository : AdminUserRepository
+    - technicalUserRepository : TechnicalUserRepository
+    + loadUserByUsername() : UserDetails
+  }
+  class JwtAuthFilter #ECEFF1 {
+    - jwtService : JwtService
+    - adminUserDetailsService : AdminUserDetailsService
+    - storeUserDetailsService : StoreUserDetailsService
+    - ecomUserDetailsService : EcomUserDetailsService
+    - tokenRevocationService : TokenRevocationService
+    + doFilterInternal() : void
+  }
+  class JwtService #EDE7F6 {
+    - jwtSecret : String
+    - jwtExpirationMs : long
+    + generateToken() : String
+    + generateToken() : String
+    + extractUsername() : String
+    + extractTokenId() : String
+    + extractExpirationEpochMillis() : long
+    + extractExpiration() : LocalDateTime
+    + extractIssuedAt() : LocalDateTime
+    + extractRole() : String
+    + getExpirationMs() : long
+    + isTokenValid() : boolean
+  }
+}
+package "api.admin.service" {
+  class AccountService #EDE7F6 {
+    - adminUserRepository : AdminUserRepository
+    - technicalUserRepository : TechnicalUserRepository
+    - passwordEncoder : PasswordEncoder
+    - tokenRevocationService : TokenRevocationService
+    + changeOwnPassword() : void
+  }
+  class CustomerPointsService #EDE7F6 {
+    - customerRepository : CustomerRepository
+    - transactionRepository : TransactionRepository
+    + refresh() : List<Transaction>
+    + resolveState() : TransactionState
+  }
+  class CustomerPrivacyService #EDE7F6 {
+    - ANONYMIZED_VALUE : String
+    - ANONYMIZED_PHONE : String
+    - customerRepository : CustomerRepository
+    - loyaltyService : LoyaltyService
+    - loyaltyTierService : LoyaltyTierService
+    + exportPersonalData() : PersonalDataExportDto
+    + anonymize() : Customer
+  }
+  class LoyaltyService #EDE7F6 {
+    - COUNTRY_NOT_ALLOWED : String
+    - ADD_POINTS_OPERATION : String
+    - couponCodeGenerator : CouponCodeGenerator
+    - referralCodeGenerator : ReferralCodeGenerator
+    - customerRepository : CustomerRepository
+    - transactionRepository : TransactionRepository
+    - couponTemplateRepository : CouponTemplateRepository
+    - couponPrefixRepository : CouponPrefixRepository
+    - customerCouponRepository : CustomerCouponRepository
+    - storePointsPromotionRepository : StorePointsPromotionRepository
+    - hierarchyPromotionRepository : HierarchyPromotionRepository
+    - customerPointsService : CustomerPointsService
+    - referralRewardService : ReferralRewardService
+    - idempotencyService : IdempotencyService
+    - availableCountryCodesConfig : String
+    + getAllCustomers() : List<Customer>
+    + getAllCustomers() : List<Customer>
+    + searchCustomers() : Page<Customer>
+    + getCustomerById() : Customer
+    + getCustomerById() : Customer
+    + createCustomer() : Customer
+    + createCustomer() : Customer
+    + createCustomer() : Customer
+    + updateCustomer() : Customer
+    + updateCustomer() : Customer
+    + setCustomerStatus() : Customer
+    + getAvailableCountryCodes() : List<String>
+    + getAvailableCountryCodes() : List<String>
+    + getIssuedCoupons() : List<CustomerCoupon>
+  }
+  class LoyaltyTierService #EDE7F6 {
+    - loyaltyTierRepository : LoyaltyTierRepository
+    + resolveTierCode() : String
+    + resolveTierCode() : String
+    + getTiers() : List<LoyaltyTier>
+  }
+  class ReferralRewardService #EDE7F6 {
+    - referralRewardRepository : ReferralRewardRepository
+    - transactionRepository : TransactionRepository
+    - customerPointsService : CustomerPointsService
+    - referralProperties : ReferralProperties
+    + awardIfEligible() : Optional<ReferralReward>
+    + getRewardsGrantedTo() : List<ReferralReward>
+  }
+  class ReportService #EDE7F6 {
+    - SUMMARY_WINDOW_DAYS : int
+    - IMMEDIATE_TYPES : List<TransactionType>
+    - CUSTOMERS_CSV_HEADER : String
+    - TRANSACTIONS_CSV_HEADER : String
+    - customerRepository : CustomerRepository
+    - transactionRepository : TransactionRepository
+    - loyaltyTierService : LoyaltyTierService
+    - pointExpiryNotificationService : PointExpiryNotificationService
+    + getSummary() : ReportsSummaryDto
+    + getExpiringPoints() : List<ExpiringPointsDto>
+    + exportCustomersCsv() : String
+    + exportTransactionsCsv() : String
+  }
+  class TechnicalUserService #EDE7F6 {
+    - technicalUserRepository : TechnicalUserRepository
+    - passwordEncoder : PasswordEncoder
+    - passwordGenerator : PasswordGenerator
+    - tokenRevocationService : TokenRevocationService
+    - availableCountryCodesConfig : String
+    + getAllTechnicalUsers() : List<TechnicalUser>
+    + createTechnicalUser() : TechnicalUserWithPassword
+    + setTechnicalUserEnabled() : TechnicalUser
+    + updateTechnicalUserPassword() : TechnicalUser
+    + resetTechnicalUserPassword() : TechnicalUserWithPassword
+    + resolveTechnicalUserCountry() : String
+    + TechnicalUserWithPassword() : record
+  }
+}
+package "api.common.dto" {
+  class PageRequests #E3F2FD {
+    - DEFAULT_PAGE_SIZE : int
+    - MAX_PAGE_SIZE : int
+    + of() : Pageable
+  }
+  class PageResponse #E3F2FD {
+    + of() : PageResponse<T>
+  }
+}
+package "api.coupon.controller" {
+  class CouponController #FFE0E6 {
+    - couponService : CouponService
+    + redeemPoints() : CouponRedeemResponse
+    + validateCoupon() : CouponValidationResponse
+  }
+}
+package "api.coupon.dto" {
+  class CouponDefinitionResponse #E3F2FD {
+    - couponTemplateId : Long
+    - couponValue : BigDecimal
+    - minimumPurchaseValue : BigDecimal
+    - requiredPoints : Integer
+    - validityDays : Integer
+    - couponPrefix : String
+    - country : String
+  }
+  class CouponRedeemRequest #E3F2FD {
+    - customerNumber : String
+    - couponTemplateId : Long
+  }
+  class CouponRedeemResponse #E3F2FD {
+    - couponCode : String
+    - customerNumber : String
+    - status : String
+    - issuedAt : LocalDateTime
+    - expiresAt : LocalDateTime
+    - definition : CouponDefinitionResponse
+  }
+  class CouponValidationResponse #E3F2FD {
+    - status : CouponValidationStatus
+    - couponCode : String
+    - customerNumber : String
+    - couponStatus : String
+    - issuedAt : LocalDateTime
+    - expiresAt : LocalDateTime
+    - definition : CouponDefinitionResponse
+  }
+}
+package "api.coupon.model" {
+  class CouponRedemptionRequest #FFF3C4 {
+    - id : Long
+    - idempotencyKey : String
+    - customerNumber : String
+    - couponTemplateId : Long
+    - customerCoupon : CustomerCoupon
+    - createdAt : LocalDateTime
+    + onCreate() : void
+  }
+  enum CouponValidationStatus #FFECB3 {
+    VALID
+    COUPON_NOT_FOUND
+    CUSTOMER_NOT_FOUND
+    COUPON_BELONGS_TO_ANOTHER_ACCOUNT
+    COUPON_ALREADY_USED
+    COUPON_EXPIRED
+    COUPON_CANCELLED
+    CUSTOMER_NOT_ACTIVE
+  }
+}
+package "api.coupon.repository" {
+  interface CouponRedemptionRequestRepository #E8F5E9 {
+  }
+}
+package "api.coupon.service" {
+  class CouponService #EDE7F6 {
+    - couponCodeGenerator : CouponCodeGenerator
+    - customerRepository : CustomerRepository
+    - couponTemplateRepository : CouponTemplateRepository
+    - customerCouponRepository : CustomerCouponRepository
+    - transactionRepository : TransactionRepository
+    - couponRedemptionRequestRepository : CouponRedemptionRequestRepository
+    - customerPointsService : CustomerPointsService
+    + redeemPointsForCoupon() : CouponRedeemResponse
+    + validateCoupon() : CouponValidationResponse
+  }
+}
+package "api.ecom.config" {
+  class EcomUserSeeder #ECEFF1 {
+    - ECOM_USERNAME : String
+    - ECOM_PASSWORD : String
+    - ecomUserRepository : EcomUserRepository
+    - passwordEncoder : PasswordEncoder
+    + run() : void
+  }
+}
+package "api.ecom.controller" {
+  class EcomAuthController #FFE0E6 {
+    - ROLE : String
+    - AUTHORITY : String
+    - authenticationTokenService : AuthenticationTokenService
+    + login() : ResponseEntity<LoginResponse>
+    + refresh() : ResponseEntity<LoginResponse>
+    + logout() : ResponseEntity<Void>
+  }
+  class EcomController #FFE0E6 {
+    - API_VERSION : String
+    - ecomService : EcomService
+    + info() : Map<String,String>
+    + getPoints() : StorePointsBalanceResponse
+    + getProfile() : EcomCustomerProfileDto
+    + getTransactions() : List<TransactionDto>
+    + getTransactionsPage() : PageResponse<TransactionDto>
+    + getCoupons() : List<CustomerCouponDto>
+    + getCouponsPage() : PageResponse<CustomerCouponDto>
+  }
+}
+package "api.ecom.dto" {
+  class EcomCustomerProfileDto #E3F2FD {
+    - customerId : Long
+    - customerNumber : String
+    - firstName : String
+    - lastName : String
+    - email : String
+    - phoneNumber : String
+    - country : String
+    - loyaltyPoints : Integer
+    - lifetimePoints : Integer
+    - loyaltyTierCode : String
+    - referralCode : String
+    - status : String
+  }
+}
+package "api.ecom.model" {
+  class EcomUser #FFF3C4 {
+  }
+}
+package "api.ecom.repository" {
+  interface EcomUserRepository #E8F5E9 {
+  }
+}
+package "api.ecom.security" {
+  class EcomUserDetailsService #EDE7F6 {
+    - ecomUserRepository : EcomUserRepository
+    + loadUserByUsername() : UserDetails
+  }
+}
+package "api.ecom.service" {
+  class EcomService #EDE7F6 {
+    - customerRepository : CustomerRepository
+    - transactionRepository : TransactionRepository
+    - customerCouponRepository : CustomerCouponRepository
+    - storeTransactionService : StoreTransactionService
+    - loyaltyTierService : LoyaltyTierService
+    + getPointsBalance() : StorePointsBalanceResponse
+    + getCustomerProfile() : EcomCustomerProfileDto
+    + getTransactions() : List<TransactionDto>
+    + getTransactions() : Page<TransactionDto>
+    + getCoupons() : List<CustomerCouponDto>
+    + getCoupons() : Page<CustomerCouponDto>
+  }
+}
+package "api.store.config" {
+  class StoreUserSeeder #ECEFF1 {
+    - STORE_USERNAME : String
+    - STORE_PASSWORD : String
+    - storeUserRepository : StoreUserRepository
+    - passwordEncoder : PasswordEncoder
+    + run() : void
+  }
+}
+package "api.store.controller" {
+  class StoreAuthController #FFE0E6 {
+    - ROLE : String
+    - AUTHORITY : String
+    - authenticationTokenService : AuthenticationTokenService
+    + login() : ResponseEntity<LoginResponse>
+    + refresh() : ResponseEntity<LoginResponse>
+    + logout() : ResponseEntity<Void>
+  }
+  class StoreController #FFE0E6 {
+    - storeTransactionService : StoreTransactionService
+    + info() : Map<String,String>
+    + registerSale() : StoreTransactionResponse
+    + registerReturn() : StoreTransactionResponse
+    + getPointsBalance() : StorePointsBalanceResponse
+  }
+}
+package "api.store.dto" {
+  class HierarchyRequest #E3F2FD {
+    - hierarchy : String
+    - productClass : String
+    - subclass : String
+  }
+  class StoreItemPriceRequest #E3F2FD {
+    - amount : BigDecimal
+    - currency : String
+  }
+  class StorePointsBalanceResponse #E3F2FD {
+    - customerId : Long
+    - customerNumber : String
+    - pendingPoints : Integer
+    - availablePoints : Integer
+    - expiredPoints : Integer
+  }
+  class StoreReturnRequest #E3F2FD {
+    - customerNumber : String
+    - items : List<StoreTransactionItemRequest>
+    - totalAmount : BigDecimal
+    - sourceTransactionNumber : String
+    - saleTransactionNumber : String
+    - purchaseTimestamp : LocalDateTime
+  }
+  class StoreSaleRequest #E3F2FD {
+    - customerNumber : String
+    - items : List<StoreTransactionItemRequest>
+    - totalAmount : BigDecimal
+    - sourceTransactionNumber : String
+    - purchaseTimestamp : LocalDateTime
+  }
+  class StoreTransactionItemRequest #E3F2FD {
+    - cartPosition : String
+    - ean : String
+    - name : String
+    - hierarchy : HierarchyRequest
+    - price : StoreItemPriceRequest
+  }
+  class StoreTransactionResponse #E3F2FD {
+    - transactionId : Long
+    - customerId : Long
+    - customerNumber : String
+    - type : TransactionType
+    - state : TransactionState
+    - points : Integer
+    - amount : BigDecimal
+    - pointsPerCurrency : BigDecimal
+    - purchaseTimestamp : LocalDateTime
+    - availableFrom : LocalDateTime
+    - expiresAt : LocalDateTime
+  }
+}
+package "api.store.model" {
+  class HierarchyPromotion #FFF3C4 {
+    - id : Long
+    - name : String
+    - country : String
+    - hierarchy : String
+    - productClass : String
+    - subclass : String
+    - type : HierarchyPromotionType
+    - multiplier : BigDecimal
+    - startsAt : LocalDateTime
+    - endsAt : LocalDateTime
+    - enabled : boolean
+  }
+  enum HierarchyPromotionType #FFECB3 {
+    MULTIPLIER
+    EXCLUSION
+  }
+  class StorePointsPromotion #FFF3C4 {
+    - id : Long
+    - name : String
+    - country : String
+    - pointsPerCurrency : BigDecimal
+    - startsAt : LocalDateTime
+    - endsAt : LocalDateTime
+    - enabled : boolean
+  }
+  class StoreUser #FFF3C4 {
+  }
+}
+package "api.store.repository" {
+  interface HierarchyPromotionRepository #E8F5E9 {
+  }
+  interface StorePointsPromotionRepository #E8F5E9 {
+  }
+  interface StoreUserRepository #E8F5E9 {
+  }
+}
+package "api.store.security" {
+  class StoreUserDetailsService #EDE7F6 {
+    - storeUserRepository : StoreUserRepository
+    + loadUserByUsername() : UserDetails
+  }
+}
+package "api.store.service" {
+  class HierarchyPromotionService #EDE7F6 {
+    - hierarchyPromotionRepository : HierarchyPromotionRepository
+    + getActivePromotions() : List<HierarchyPromotion>
+    + isItemExcluded() : boolean
+    + resolveItemMultiplier() : BigDecimal
+  }
+  class StorePromotionService #EDE7F6 {
+    - storePointsPromotionRepository : StorePointsPromotionRepository
+    - defaultPointsPerCurrency : BigDecimal
+    + resolvePointsPerCurrency() : BigDecimal
+  }
+  class StoreTransactionService #EDE7F6 {
+    - ZERO : BigDecimal
+    - customerRepository : CustomerRepository
+    - transactionRepository : TransactionRepository
+    - storePromotionService : StorePromotionService
+    - hierarchyPromotionService : HierarchyPromotionService
+    - customerPointsService : CustomerPointsService
+    - referralRewardService : ReferralRewardService
+    + registerSale() : StoreTransactionResponse
+    + registerReturn() : StoreTransactionResponse
+    + getPointsBalance() : StorePointsBalanceResponse
+  }
+}
+package "config" {
+  class MaintenanceJobs #FFFFFF {
+    - IDEMPOTENCY_RETENTION_DAYS : int
+    - customerCouponRepository : CustomerCouponRepository
+    - pointExpiryNotificationService : PointExpiryNotificationService
+    - tokenRevocationService : TokenRevocationService
+    - idempotencyService : IdempotencyService
+    + markLapsedCouponsAsExpired() : void
+    + sendPointExpiryNotifications() : void
+    + purgeRevokedTokens() : void
+    + purgeIdempotencyKeys() : void
+  }
+  class OpenApiConfig #ECEFF1 {
+    + loyaltyClubOpenApi() : OpenAPI
+    + adminApi() : GroupedOpenApi
+    + storeApi() : GroupedOpenApi
+    + ecomApi() : GroupedOpenApi
+  }
+  class PointExpiryProperties #ECEFF1 {
+    - enabled : Boolean
+    - noticeDays : List<Integer>
+    - minimumPoints : Integer
+  }
+  class ReferralProperties #ECEFF1 {
+    - enabled : Boolean
+    - minimumPurchaseAmount : BigDecimal
+    - referrerPoints : Integer
+    - referredPoints : Integer
+    - maxRewardsPerReferrer : Integer
+    - qualifyingWindowDays : Integer
+    - validityDays : Integer
+  }
+  class SecurityConfig #ECEFF1 {
+    - OPENAPI_PATHS : String[]
+    + corsConfigurationSource() : CorsConfigurationSource
+    + adminAuthenticationProvider() : DaoAuthenticationProvider
+    + storeAuthenticationProvider() : DaoAuthenticationProvider
+    + ecomAuthenticationProvider() : DaoAuthenticationProvider
+    + passwordEncoder() : PasswordEncoder
+    + authenticationManager() : AuthenticationManager
+  }
+}
+package "exception" {
+  class BusinessException #ECEFF1 {
+  }
+  class GlobalExceptionHandler #ECEFF1 {
+    + handleAuthException() : ResponseEntity<ProblemDetail>
+    + handleAccessDenied() : ResponseEntity<ProblemDetail>
+    + handleValidationException() : ResponseEntity<ProblemDetail>
+    + handleResourceNotFound() : ResponseEntity<ProblemDetail>
+    + handleIllegalArgumentException() : ResponseEntity<ProblemDetail>
+    + handleRuntimeException() : ResponseEntity<ProblemDetail>
+  }
+  class ResourceNotFoundException #ECEFF1 {
+  }
+}
+package "idempotency" {
+  class IdempotencyReservationService #EDE7F6 {
+    - idempotentOperationRepository : IdempotentOperationRepository
+    + find() : Optional<IdempotentOperation>
+    + reserve() : Optional<IdempotentOperation>
+    + complete() : void
+    + release() : void
+  }
+  class IdempotencyService #EDE7F6 {
+    - MAX_KEY_LENGTH : int
+    - reservationService : IdempotencyReservationService
+    - idempotentOperationRepository : IdempotentOperationRepository
+    + execute() : T
+    + purgeOlderThan() : int
+  }
+  class IdempotentOperation #FFFFFF {
+    - id : Long
+    - operation : String
+    - idempotencyKey : String
+    - requestFingerprint : String
+    - resultId : Long
+    - createdAt : LocalDateTime
+    + onCreate() : void
+  }
+  interface IdempotentOperationRepository #E8F5E9 {
+  }
+}
+package "model" {
+  class BaseUser #FFF3C4 {
+    - id : Long
+    - username : String
+    - password : String
+    - passwordChangedAt : LocalDateTime
+    - enabled : boolean
+    + onCreate() : void
+  }
+}
+package "notification" {
+  class LoggingNotificationSender #FFFFFF {
+    + channel() : String
+    + send() : void
+  }
+  interface NotificationSender #FFFFFF {
+  }
+  class PointExpiryNotification #FFFFFF {
+    - id : Long
+    - customer : Customer
+    - transaction : Transaction
+    - noticeDays : Integer
+    - points : Integer
+    - expiresAt : LocalDateTime
+    - createdAt : LocalDateTime
+    - deliveredAt : LocalDateTime
+    - channel : String
+    + onCreate() : void
+  }
+  interface PointExpiryNotificationRepository #E8F5E9 {
+  }
+  class PointExpiryNotificationService #EDE7F6 {
+    - IMMEDIATE_TYPES : List<TransactionType>
+    - transactionRepository : TransactionRepository
+    - notificationRepository : PointExpiryNotificationRepository
+    - notificationSender : NotificationSender
+    - properties : PointExpiryProperties
+    + notifyUpcomingExpirations() : int
+    + findExpiringWithin() : List<Transaction>
+  }
+}
+package "security" {
+  class AuthenticationTokenService #EDE7F6 {
+    - authenticationManager : AuthenticationManager
+    - jwtService : JwtService
+    - tokenRevocationService : TokenRevocationService
+    + login() : IssuedToken
+    + loginAsAny() : IssuedToken
+    + refresh() : IssuedToken
+    + logout() : void
+    + issue() : IssuedToken
+    + hasAuthority() : boolean
+    + IssuedToken() : record
+  }
+  class RevokedToken #FFFFFF {
+    - id : Long
+    - tokenId : String
+    - username : String
+    - expiresAt : LocalDateTime
+    - revokedAt : LocalDateTime
+    + onCreate() : void
+  }
+  interface RevokedTokenRepository #E8F5E9 {
+  }
+  class TokenRevocationService #EDE7F6 {
+    - revokedTokenRepository : RevokedTokenRepository
+    - userTokenCutoffRepository : UserTokenCutoffRepository
+    + revokeToken() : void
+    + revokeAllTokensFor() : void
+    + isRevoked() : boolean
+    + purgeExpired() : int
+  }
+  class UserTokenCutoff #FFFFFF {
+    - id : Long
+    - username : String
+    - notBefore : LocalDateTime
+    - reason : String
+  }
+  interface UserTokenCutoffRepository #E8F5E9 {
+  }
+}
+package "util" {
+  class CouponCodeGenerator #FFFFFF {
+    - secureRandom : SecureRandom
+    + generateElevenDigits() : String
+  }
+  class PasswordGenerator #FFFFFF {
+    - UPPERCASE : String
+    - LOWERCASE : String
+    - DIGITS : String
+    - SPECIAL : String
+    - ALL : String
+    - DEFAULT_LENGTH : int
+    - secureRandom : SecureRandom
+    + generate() : String
+    + generate() : String
+  }
+  class PasswordPolicy #FFFFFF {
+    - MIN_LENGTH : int
+    - MAX_LENGTH : int
+    + validate() : void
+  }
+  class ReferralCodeGenerator #FFFFFF {
+    - ALPHABET : String
+    - secureRandom : SecureRandom
+    + generate() : String
+  }
+}
+AccountService --> AdminUserRepository
+AccountService --> TechnicalUserRepository
+AccountService --> TokenRevocationService
+AdminUserDetailsService --> AdminUserRepository
+AdminUserDetailsService --> TechnicalUserRepository
+AdminUserSeeder --> AdminUserRepository
+AuditAspect --> AdminAuditLogRepository
+AuditController --> AuditService
+AuditService --> AdminAuditLogRepository
+AuthController --> AccountService
+AuthController --> AuthenticationTokenService
+AuthController --> TechnicalUserRepository
+AuthenticationTokenService --> JwtService
+AuthenticationTokenService --> TokenRevocationService
+BaseUser <|-- AdminUser
+BaseUser <|-- EcomUser
+BaseUser <|-- StoreUser
+CouponController --> CouponService
+CouponIssueRequest --> CouponReason
+CouponPrefixSeeder --> CouponPrefixRepository
+CouponRedeemResponse --> CouponDefinitionResponse
+CouponRedemptionRequest --> CustomerCoupon
+CouponService --> CouponCodeGenerator
+CouponService --> CouponRedemptionRequestRepository
+CouponService --> CouponTemplateRepository
+CouponService --> CustomerCouponRepository
+CouponService --> CustomerPointsService
+CouponService --> CustomerRepository
+CouponService --> TransactionRepository
+CouponTemplateSeeder --> CouponTemplateRepository
+CouponValidationResponse --> CouponDefinitionResponse
+CouponValidationResponse --> CouponValidationStatus
+Customer --> CustomerStatus
+Customer "1" --> "*" Transaction
+CustomerCoupon --> CouponReason
+CustomerCoupon --> CouponStatus
+CustomerCoupon --> CouponTemplate
+CustomerCoupon --> Customer
+CustomerPointsService --> CustomerRepository
+CustomerPointsService --> TransactionRepository
+CustomerPrivacyService --> CustomerRepository
+CustomerPrivacyService --> LoyaltyService
+CustomerPrivacyService --> LoyaltyTierService
+CustomerStatusRequest --> CustomerStatus
+EcomAuthController --> AuthenticationTokenService
+EcomController --> EcomService
+EcomService --> CustomerCouponRepository
+EcomService --> CustomerRepository
+EcomService --> LoyaltyTierService
+EcomService --> StoreTransactionService
+EcomService --> TransactionRepository
+EcomUserDetailsService --> EcomUserRepository
+EcomUserSeeder --> EcomUserRepository
+HierarchyPromotion --> HierarchyPromotionType
+HierarchyPromotionCreateRequest --> HierarchyPromotionType
+HierarchyPromotionDto --> HierarchyPromotionType
+HierarchyPromotionService --> HierarchyPromotionRepository
+IdempotencyReservationService --> IdempotentOperationRepository
+IdempotencyService --> IdempotencyReservationService
+IdempotencyService --> IdempotentOperationRepository
+JwtAuthFilter --> AdminUserDetailsService
+JwtAuthFilter --> EcomUserDetailsService
+JwtAuthFilter --> JwtService
+JwtAuthFilter --> StoreUserDetailsService
+JwtAuthFilter --> TokenRevocationService
+LoyaltyController --> CustomerPrivacyService
+LoyaltyController --> LoyaltyService
+LoyaltyController --> LoyaltyTierService
+LoyaltyController --> TechnicalUserService
+LoyaltyService --> CouponCodeGenerator
+LoyaltyService --> CouponPrefixRepository
+LoyaltyService --> CouponTemplateRepository
+LoyaltyService --> CustomerCouponRepository
+LoyaltyService --> CustomerPointsService
+LoyaltyService --> CustomerRepository
+LoyaltyService --> HierarchyPromotionRepository
+LoyaltyService --> IdempotencyService
+LoyaltyService --> ReferralCodeGenerator
+LoyaltyService --> ReferralRewardService
+LoyaltyService --> StorePointsPromotionRepository
+LoyaltyService --> TransactionRepository
+LoyaltyTierService --> LoyaltyTierRepository
+MaintenanceJobs --> CustomerCouponRepository
+MaintenanceJobs --> IdempotencyService
+MaintenanceJobs --> PointExpiryNotificationService
+MaintenanceJobs --> TokenRevocationService
+NotificationSender <|-- LoggingNotificationSender
+PointExpiryNotification --> Customer
+PointExpiryNotification --> Transaction
+PointExpiryNotificationService --> NotificationSender
+PointExpiryNotificationService --> PointExpiryNotificationRepository
+PointExpiryNotificationService --> PointExpiryProperties
+PointExpiryNotificationService --> TransactionRepository
+PointExpiryNotificationService "1" --> "*" TransactionType
+PurchaseHistoryDto "1" --> "*" PurchaseHistoryPointDto
+ReferralReward --> Customer
+ReferralReward --> Transaction
+ReferralRewardService --> CustomerPointsService
+ReferralRewardService --> ReferralProperties
+ReferralRewardService --> ReferralRewardRepository
+ReferralRewardService --> TransactionRepository
+ReportController --> ReportService
+ReportController --> TechnicalUserService
+ReportService --> CustomerRepository
+ReportService --> LoyaltyTierService
+ReportService --> PointExpiryNotificationService
+ReportService --> TransactionRepository
+ReportService "1" --> "*" TransactionType
+StoreAuthController --> AuthenticationTokenService
+StoreController --> StoreTransactionService
+StorePromotionService --> StorePointsPromotionRepository
+StoreReturnRequest "1" --> "*" StoreTransactionItemRequest
+StoreSaleRequest "1" --> "*" StoreTransactionItemRequest
+StoreTransactionItemRequest --> HierarchyRequest
+StoreTransactionItemRequest --> StoreItemPriceRequest
+StoreTransactionResponse --> TransactionState
+StoreTransactionResponse --> TransactionType
+StoreTransactionService --> CustomerPointsService
+StoreTransactionService --> CustomerRepository
+StoreTransactionService --> HierarchyPromotionService
+StoreTransactionService --> ReferralRewardService
+StoreTransactionService --> StorePromotionService
+StoreTransactionService --> TransactionRepository
+StoreUserDetailsService --> StoreUserRepository
+StoreUserSeeder --> StoreUserRepository
+TechnicalUserController --> TechnicalUserService
+TechnicalUserService --> PasswordGenerator
+TechnicalUserService --> TechnicalUserRepository
+TechnicalUserService --> TokenRevocationService
+TokenRevocationService --> RevokedTokenRepository
+TokenRevocationService --> UserTokenCutoffRepository
+Transaction --> Customer
+Transaction --> TransactionState
+Transaction --> TransactionType
+@enduml

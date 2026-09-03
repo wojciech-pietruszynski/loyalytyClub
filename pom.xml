@@ -69,6 +69,17 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
+        <!--
+            Sonda gotowosci dla orkiestracji kontenerow. Bez niej docker compose
+            potrafi sprawdzic tylko, czy port jest otwarty, a Spring otwiera go
+            zanim skoncza sie migracje Liquibase - kontener zglaszalby gotowosc
+            wczesniej, niz aplikacja realnie obsluguje zadania. Wystawiony jest
+            wylacznie /actuator/health (patrz application.properties).
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
@@ -123,6 +134,30 @@
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+            Pozwala wykonac zadanie w tescie z konkretna rola i tym samym sprawdzic
+            regulami dostepu z SecurityConfig na pelnym lancuchu filtrow. Bez tego
+            rozdzial na role panelu, kasy i sklepu internetowego byl opisany
+            wylacznie w konfiguracji i nieweryfikowany.
+        -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+            Baza w pamieci dla testow warstwy persystencji i testow integracyjnych.
+            Swiadomie zamiast Testcontainers: potok CI uruchamia testy wewnatrz
+            "docker build" (etap test w Dockerfile), gdzie nie ma dostepu do demona
+            Dockera. Schemat dla testow tworzy Hibernate z mapowan encji, a nie
+            Liquibase, bo migracje sa pisane w SQL PostgreSQL-a (patrz
+            src/test/resources/application-test.properties).
+        -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -210,6 +245,55 @@
                         <id>report</id>
                         <phase>test</phase>
                         <goals><goal>report</goal></goals>
+                    </execution>
+                    <!--
+                        Bramka pokrycia. Raport bez progu pokazuje spadek, ale go nie
+                        zatrzymuje - kod dopisany bez testow obniza pokrycie, a budowanie
+                        nadal przechodzi. Progi ustawione sa nieco ponizej stanu biezacego:
+                        maja zatrzymac regres, a nie wymuszac scigania sie o dziesiate
+                        czesci procenta przy kazdej zmianie.
+
+                        Wylaczenia obejmuja miejsca, dla ktorych test jednostkowy nie
+                        niesie tresci: klase startowa, konfiguracje i obiekty transferowe
+                        (rekordy i klasy z samymi akcesorami). Sa one pokryte posrednio
+                        przez testy kontrolerow i serwisow, ale nie powinny podbijac
+                        ani zanizac wyniku.
+                    -->
+                    <execution>
+                        <id>check</id>
+                        <!--
+                            Faza "test", a nie domyslna "verify": potok CI i etap test
+                            w Dockerfile uruchamiaja "mvn test", wiec bramka zwiazana
+                            z pozniejsza faza nigdy by sie nie wykonala. Wykonania
+                            w obrebie jednej fazy ida w kolejnosci deklaracji,
+                            wiec raport powstaje przed sprawdzeniem progow.
+                        -->
+                        <phase>test</phase>
+                        <goals><goal>check</goal></goals>
+                        <configuration>
+                            <excludes>
+                                <exclude>**/LoyaltyClubApplication.class</exclude>
+                                <exclude>**/config/**</exclude>
+                                <exclude>**/dto/**</exclude>
+                            </excludes>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.80</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.65</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

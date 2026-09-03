@@ -1,0 +1,264 @@
+[
+ {
+  "number": 1,
+  "title": "Model domenowy - encje JPA i typy wyliczeniowe (cz. 1 z 2)",
+  "members": [
+   "AdminUser",
+   "CouponPrefix",
+   "CouponReason",
+   "CouponStatus",
+   "CouponTemplate",
+   "Customer",
+   "CustomerCoupon",
+   "CustomerStatus",
+   "LoyaltyTier",
+   "ReferralReward",
+   "TechnicalUser",
+   "Transaction",
+   "TransactionState",
+   "TransactionType"
+  ],
+  "width": 1444,
+  "height": 1153
+ },
+ {
+  "number": 2,
+  "title": "Model domenowy - encje JPA i typy wyliczeniowe (cz. 2 z 2)",
+  "members": [
+   "BaseUser",
+   "CouponRedemptionRequest",
+   "CouponValidationStatus",
+   "EcomUser",
+   "HierarchyPromotion",
+   "HierarchyPromotionType",
+   "StorePointsPromotion",
+   "StoreUser"
+  ],
+  "width": 1818,
+  "height": 568
+ },
+ {
+  "number": 3,
+  "title": "Warstwa dostepu do danych - repozytoria i idempotencja (cz. 1 z 3)",
+  "members": [
+   "AdminUserRepository",
+   "CouponPrefixRepository",
+   "CouponTemplateRepository",
+   "CustomerCouponRepository"
+  ],
+  "width": 1150,
+  "height": 219
+ },
+ {
+  "number": 4,
+  "title": "Warstwa dostepu do danych - repozytoria i idempotencja (cz. 2 z 3)",
+  "members": [
+   "CustomerRepository",
+   "LoyaltyTierRepository",
+   "ReferralRewardRepository",
+   "TechnicalUserRepository",
+   "TransactionRepository"
+  ],
+  "width": 1866,
+  "height": 219
+ },
+ {
+  "number": 5,
+  "title": "Warstwa dostepu do danych - repozytoria i idempotencja (cz. 3 z 3)",
+  "members": [
+   "CouponRedemptionRequestRepository",
+   "EcomUserRepository",
+   "HierarchyPromotionRepository",
+   "IdempotencyReservationService",
+   "IdempotencyService",
+   "IdempotentOperation",
+   "IdempotentOperationRepository",
+   "StorePointsPromotionRepository",
+   "StoreUserRepository"
+  ],
+  "width": 1563,
+  "height": 468
+ },
+ {
+  "number": 6,
+  "title": "Modul administracyjny - kontrolery, uslugi, audyt, bezpieczenstwo (cz. 1 z 2)",
+  "members": [
+   "AdminAuditLog",
+   "AdminAuditLogRepository",
+   "AdminUserSeeder",
+   "AuditAspect",
+   "AuditService",
+   "CouponPrefixSeeder",
+   "CouponTemplateSeeder"
+  ],
+  "width": 2166,
+  "height": 333
+ },
+ {
+  "number": 7,
+  "title": "Modul administracyjny - kontrolery, uslugi, audyt, bezpieczenstwo (cz. 2 z 2)",
+  "members": [
+   "AccountService",
+   "AdminUserDetailsService",
+   "AuditController",
+   "AuthController",
+   "CustomerPointsService",
+   "CustomerPrivacyService",
+   "JwtAuthFilter",
+   "JwtService",
+   "LoyaltyController",
+   "LoyaltyService",
+   "LoyaltyTierService",
+   "ReferralRewardService",
+   "ReportController",
+   "ReportService",
+   "TechnicalUserController",
+   "TechnicalUserService"
+  ],
+  "width": 1809,
+  "height": 1409
+ },
+ {
+  "number": 8,
+  "title": "Moduly kanalowe - coupon, ecom, store (cz. 1 z 2)",
+  "members": [
+   "CouponController",
+   "CouponService",
+   "EcomAuthController",
+   "EcomController",
+   "EcomService",
+   "EcomUserDetailsService",
+   "EcomUserSeeder",
+   "StoreAuthController",
+   "StoreController",
+   "StoreUserSeeder"
+  ],
+  "width": 2351,
+  "height": 589
+ },
+ {
+  "number": 9,
+  "title": "Moduly kanalowe - coupon, ecom, store (cz. 2 z 2)",
+  "members": [
+   "HierarchyPromotionService",
+   "StorePromotionService",
+   "StoreTransactionService",
+   "StoreUserDetailsService"
+  ],
+  "width": 2350,
+  "height": 429
+ },
+ {
+  "number": 10,
+  "title": "Kontrakty API - DTO modulu administracyjnego i wspolne (cz. 1 z 2)",
+  "members": [
+   "AdminAuditLogDto",
+   "ChangePasswordRequest",
+   "CouponIssueRequest",
+   "CouponTemplateCreateRequest",
+   "CouponTemplateDto",
+   "CustomerCouponDto",
+   "CustomerDto",
+   "CustomerStatusRequest",
+   "ExpiringPointsDto",
+   "HierarchyPromotionCreateRequest",
+   "HierarchyPromotionDto",
+   "LoginRequest",
+   "LoginResponse",
+   "PersonalDataExportDto"
+  ],
+  "width": 1856,
+  "height": 759
+ },
+ {
+  "number": 11,
+  "title": "Kontrakty API - DTO modulu administracyjnego i wspolne (cz. 2 z 2)",
+  "members": [
+   "PageRequests",
+   "PageResponse",
+   "PointsRequest",
+   "PurchaseHistoryDto",
+   "PurchaseHistoryPointDto",
+   "ReferralRewardDto",
+   "ReportsSummaryDto",
+   "StorePromotionCreateRequest",
+   "StorePromotionDto",
+   "StorePromotionStatusRequest",
+   "TechnicalUserCreateRequest",
+   "TechnicalUserDto",
+   "TechnicalUserPasswordRequest",
+   "TechnicalUserStatusRequest",
+   "TransactionDto"
+  ],
+  "width": 1266,
+  "height": 626
+ },
+ {
+  "number": 12,
+  "title": "Kontrakty API - DTO modulow coupon, ecom, store",
+  "members": [
+   "CouponDefinitionResponse",
+   "CouponRedeemRequest",
+   "CouponRedeemResponse",
+   "CouponValidationResponse",
+   "EcomCustomerProfileDto",
+   "HierarchyRequest",
+   "StoreItemPriceRequest",
+   "StorePointsBalanceResponse",
+   "StoreReturnRequest",
+   "StoreSaleRequest",
+   "StoreTransactionItemRequest",
+   "StoreTransactionResponse"
+  ],
+  "width": 2071,
+  "height": 592
+ },
+ {
+  "number": 13,
+  "title": "Infrastruktura - konfiguracja, bezpieczenstwo, wyjatki, powiadomienia, narzedzia (cz. 1 z 3)",
+  "members": [
+   "LoyaltyClubApplication",
+   "MaintenanceJobs",
+   "OpenApiConfig",
+   "PointExpiryProperties",
+   "ReferralProperties",
+   "SecurityConfig"
+  ],
+  "width": 1351,
+  "height": 283
+ },
+ {
+  "number": 14,
+  "title": "Infrastruktura - konfiguracja, bezpieczenstwo, wyjatki, powiadomienia, narzedzia (cz. 2 z 3)",
+  "members": [
+   "BusinessException",
+   "GlobalExceptionHandler",
+   "LoggingNotificationSender",
+   "NotificationSender",
+   "PointExpiryNotification",
+   "PointExpiryNotificationRepository",
+   "PointExpiryNotificationService",
+   "ResourceNotFoundException"
+  ],
+  "width": 1781,
+  "height": 387
+ },
+ {
+  "number": 15,
+  "title": "Infrastruktura - konfiguracja, bezpieczenstwo, wyjatki, powiadomienia, narzedzia (cz. 3 z 3)",
+  "members": [
+   "AuthenticationTokenService",
+   "CouponCodeGenerator",
+   "PasswordGenerator",
+   "PasswordPolicy",
+   "ReferralCodeGenerator",
+   "RevokedToken",
+   "RevokedTokenRepository",
+   "TokenRevocationService",
+   "UserTokenCutoff",
+   "UserTokenCutoffRepository"
+  ],
+  "width": 1457,
+  "height": 520
+ }
+]

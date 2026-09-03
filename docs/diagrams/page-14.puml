@@ -1,0 +1,84 @@
+@startuml
+!pragma layout smetana
+skinparam dpi 96
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam classFontSize 12
+skinparam classAttributeFontSize 10
+skinparam ArrowColor #546E7A
+skinparam classBorderColor #37474F
+skinparam classBackgroundColor #FFFFFF
+skinparam packageBorderColor #90A4AE
+skinparam packageBackgroundColor #FAFAFA
+skinparam packageFontSize 13
+skinparam packageFontStyle bold
+skinparam nodesep 22
+skinparam ranksep 40
+hide empty members
+
+package "exception" {
+  class BusinessException #ECEFF1 {
+  }
+  class GlobalExceptionHandler #ECEFF1 {
+    + handleAuthException() : ResponseEntity<ProblemDetail>
+    + handleAccessDenied() : ResponseEntity<ProblemDetail>
+    + handleValidationException() : ResponseEntity<ProblemDetail>
+    + handleResourceNotFound() : ResponseEntity<ProblemDetail>
+    + handleIllegalArgumentException() : ResponseEntity<ProblemDetail>
+    + handleRuntimeException() : ResponseEntity<ProblemDetail>
+  }
+  class ResourceNotFoundException #ECEFF1 {
+  }
+}
+package "notification" {
+  class LoggingNotificationSender #FFFFFF {
+    + channel() : String
+    + send() : void
+  }
+  interface NotificationSender #FFFFFF {
+  }
+  class PointExpiryNotification #FFFFFF {
+    - id : Long
+    - customer : Customer
+    - transaction : Transaction
+    - noticeDays : Integer
+    - points : Integer
+    - expiresAt : LocalDateTime
+    - createdAt : LocalDateTime
+    - deliveredAt : LocalDateTime
+    - channel : String
+    + onCreate() : void
+  }
+  interface PointExpiryNotificationRepository #E8F5E9 {
+  }
+  class PointExpiryNotificationService #EDE7F6 {
+    - IMMEDIATE_TYPES : List<TransactionType>
+    - transactionRepository : TransactionRepository
+    - notificationRepository : PointExpiryNotificationRepository
+    - notificationSender : NotificationSender
+    - properties : PointExpiryProperties
+    + notifyUpcomingExpirations() : int
+    + findExpiringWithin() : List<Transaction>
+  }
+}
+package "powiazania spoza tej strony" #F0F0F0 {
+  class Customer #F0F0F0
+  class MaintenanceJobs #F0F0F0
+  class PointExpiryProperties #F0F0F0
+  class ReportService #F0F0F0
+  class Transaction #F0F0F0
+  class TransactionRepository #F0F0F0
+  class TransactionType #F0F0F0
+}
+MaintenanceJobs --> PointExpiryNotificationService
+NotificationSender <|-- LoggingNotificationSender
+PointExpiryNotification --> Customer
+PointExpiryNotification --> Transaction
+PointExpiryNotificationService --> NotificationSender
+PointExpiryNotificationService --> PointExpiryNotificationRepository
+PointExpiryNotificationService --> PointExpiryProperties
+PointExpiryNotificationService --> TransactionRepository
+PointExpiryNotificationService "1" --> "*" TransactionType
+ReportService --> PointExpiryNotificationService
+@enduml

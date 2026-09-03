@@ -11,7 +11,18 @@ import java.time.LocalDateTime;
  * wyniku, ktorym odpowiadamy na powtorzenie zadania.
  */
 @Entity
-@Table(name = "idempotent_operations")
+@Table(
+        name = "idempotent_operations",
+        /*
+         * Jednoznacznosc pary (operacja, klucz) jest tym, co realnie blokuje
+         * podwojne wykonanie: rownolegle zadanie z tym samym kluczem ma dostac
+         * blad zapisu, a nie drugi wiersz. Ograniczenie zaklada migracja 015;
+         * powtorzenie go w mapowaniu sprawia, ze zalozenie jest widoczne w kodzie
+         * i weryfikowalne testem warstwy persystencji.
+         */
+        uniqueConstraints = @UniqueConstraint(
+                name = "uq_idempotent_operations_operation_key",
+                columnNames = {"operation", "idempotency_key"}))
 @Getter
 @Setter
 @NoArgsConstructor

@@ -1,0 +1,114 @@
+name: CI
+
+# Bramka jakosci warstwy serwerowej. Testy, budowanie obrazu i weryfikacja
+# uruchomionego stosu wykonuja sie w kontenerach zbudowanych z Dockerfile
+# w korzeniu repozytorium - tym samym, ktorego uzywa potok wdrozeniowy
+# w jenkins/build.jenkinsfile. Na maszynie CI nie jest potrzebne ani JDK 25,
+# ani Maven.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  quality:
+    name: Testy jednostkowe
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Pobranie kodu
+        uses: actions/checkout@v4
+
+      - name: Przygotowanie Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Testy w kontenerze
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: test-reports
+          # Powodzenie budowania oznacza zielone testy; cel wystawia raporty
+          # surefire i JaCoCo do katalogu roboczego.
+          outputs: type=local,dest=./ci-out
+          cache-from: type=gha,scope=backend-ci
+          cache-to: type=gha,mode=max,scope=backend-ci
+
+      - name: Raporty testow
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: ci-out/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  stack:
+    name: Obraz i uruchomienie stosu
+    needs: quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Pobranie kodu
+        uses: actions/checkout@v4
+
+      - name: Przygotowanie Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Budowanie obrazu wykonawczego
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runtime
+          # Obraz musi trafic do lokalnego demona, zeby compose mial co
+          # uruchomic bez ponownego budowania.
+          load: true
+          tags: loyaltyclub/backend:local
+          cache-from: type=gha,scope=backend-image
+          cache-to: type=gha,mode=max,scope=backend-image
+
+      - name: Uruchomienie stosu
+        run: |
+          set -euo pipefail
+          # --no-build: obraz zbudowal poprzedni krok i jest oznaczony
+          # dokladnie tak, jak oczekuje compose (domyslne BACKEND_IMAGE:IMAGE_TAG).
+          docker compose up -d --no-build
+
+      - name: Weryfikacja gotowosci i sondy
+        run: |
+          set -euo pipefail
+          name=$(docker compose ps -q backend)
+          for _ in $(seq 1 60); do
+            if [ "$(docker inspect -f '{{.State.Health.Status}}' "$name")" = healthy ]; then
+              break
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' "$name")" != true ]; then
+              break
+            fi
+            sleep 3
+          done
+          if [ "$(docker inspect -f '{{.State.Health.Status}}' "$name")" != healthy ]; then
+            docker compose logs --tail 200
+            echo "BLAD: backend nie zglosil gotowosci."
+            exit 1
+          fi
+          # Sonda odpytywana z wnetrza sieci kontenerow - ta sama droga,
+          # ktora chodzi frontend.
+          bash ./scripts/stack.sh smoke
+
+      - name: Weryfikacja migracji Liquibase
+        run: |
+          set -euo pipefail
+          # Pusty wolumen na starcie oznacza, ze zestaw migracji musial
+          # przejsc od zera - warto to potwierdzic wprost.
+          docker compose exec -T db \
+            psql -U user -d loyalty_db -c "select count(*) from databasechangelog;"
+
+      - name: Logi przy niepowodzeniu
+        if: failure()
+        run: docker compose logs --tail 300
+
+      - name: Sprzatanie
+        if: always()
+        run: docker compose down -v || true

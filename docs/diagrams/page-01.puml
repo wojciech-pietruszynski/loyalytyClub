@@ -1,0 +1,175 @@
+@startuml
+!pragma layout smetana
+skinparam dpi 96
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam classFontSize 12
+skinparam classAttributeFontSize 10
+skinparam ArrowColor #546E7A
+skinparam classBorderColor #37474F
+skinparam classBackgroundColor #FFFFFF
+skinparam packageBorderColor #90A4AE
+skinparam packageBackgroundColor #FAFAFA
+skinparam packageFontSize 13
+skinparam packageFontStyle bold
+skinparam nodesep 22
+skinparam ranksep 40
+hide empty members
+
+package "api.admin.model" {
+  class AdminUser #FFF3C4 {
+  }
+  class CouponPrefix #FFF3C4 {
+    - id : Long
+    - value : String
+  }
+  enum CouponReason #FFECB3 {
+    POINTS_EXCHANGE
+    COMPLAINT
+  }
+  enum CouponStatus #FFECB3 {
+    ACTIVE
+    USED
+    EXPIRED
+    CANCELLED
+    + isFinal() : boolean
+  }
+  class CouponTemplate #FFF3C4 {
+    - id : Long
+    - couponValue : BigDecimal
+    - minimumPurchaseValue : BigDecimal
+    - requiredPoints : Integer
+    - country : String
+    - validityDays : Integer
+    - couponPrefix : String
+  }
+  class Customer #FFF3C4 {
+    - id : Long
+    - firstName : String
+    - lastName : String
+    - email : String
+    - customerNumber : String
+    - phoneNumber : String
+    - country : String
+    - loyaltyPoints : Integer
+    - lifetimePoints : Integer
+    - status : CustomerStatus
+    - statusChangedAt : LocalDateTime
+    - createdAt : LocalDateTime
+    - referralCode : String
+    - referredBy : Customer
+    - transactions : List<Transaction>
+    + onCreate() : void
+  }
+  class CustomerCoupon #FFF3C4 {
+    - id : Long
+    - couponCode : String
+    - country : String
+    - customer : Customer
+    - couponTemplate : CouponTemplate
+    - reason : CouponReason
+    - status : CouponStatus
+    - issuedAt : LocalDateTime
+    - expiresAt : LocalDateTime
+    + effectiveStatus() : CouponStatus
+  }
+  enum CustomerStatus #FFECB3 {
+    ACTIVE
+    INACTIVE
+    ANONYMIZED
+    + allowsPointOperations() : boolean
+  }
+  class LoyaltyTier #FFF3C4 {
+    - id : Long
+    - code : String
+    - minPoints : Integer
+  }
+  class ReferralReward #FFF3C4 {
+    - id : Long
+    - referrer : Customer
+    - referred : Customer
+    - qualifyingTransaction : Transaction
+    - referrerTransaction : Transaction
+    - referredTransaction : Transaction
+    - referrerPoints : Integer
+    - referredPoints : Integer
+    - country : String
+    - awardedAt : LocalDateTime
+    + onCreate() : void
+  }
+  class TechnicalUser #FFF3C4 {
+    - id : Long
+    - username : String
+    - password : String
+    - passwordChangedAt : LocalDateTime
+    - country : String
+    - enabled : boolean
+    + onCreate() : void
+  }
+  class Transaction #FFF3C4 {
+    - id : Long
+    - customer : Customer
+    - points : Integer
+    - amount : BigDecimal
+    - pointsPerCurrency : BigDecimal
+    - description : String
+    - country : String
+    - type : TransactionType
+    - state : TransactionState
+    - sourceTransactionNumber : String
+    - purchaseTimestamp : LocalDateTime
+    - availableFrom : LocalDateTime
+    - expiresAt : LocalDateTime
+    - timestamp : LocalDateTime
+    - sourceTransaction : Transaction
+    + onCreate() : void
+  }
+  enum TransactionState #FFECB3 {
+    PENDING
+    AVAILABLE
+    EXPIRED
+  }
+  enum TransactionType #FFECB3 {
+    SALE
+    RETURN
+    MANUAL_ADJUSTMENT
+    REFERRAL
+    POINTS_REDEMPTION
+    POINTS_REFUND
+    + isImmediatelyAvailable() : boolean
+    + countsTowardsLifetimePoints() : boolean
+  }
+}
+package "powiazania spoza tej strony" #F0F0F0 {
+  class BaseUser #F0F0F0
+  class CouponIssueRequest #F0F0F0
+  class CouponRedemptionRequest #F0F0F0
+  class CustomerStatusRequest #F0F0F0
+  class PointExpiryNotification #F0F0F0
+  class PointExpiryNotificationService #F0F0F0
+  class ReportService #F0F0F0
+  class StoreTransactionResponse #F0F0F0
+}
+BaseUser <|-- AdminUser
+CouponIssueRequest --> CouponReason
+CouponRedemptionRequest --> CustomerCoupon
+Customer --> CustomerStatus
+Customer "1" --> "*" Transaction
+CustomerCoupon --> CouponReason
+CustomerCoupon --> CouponStatus
+CustomerCoupon --> CouponTemplate
+CustomerCoupon --> Customer
+CustomerStatusRequest --> CustomerStatus
+PointExpiryNotification --> Customer
+PointExpiryNotification --> Transaction
+PointExpiryNotificationService "1" --> "*" TransactionType
+ReferralReward --> Customer
+ReferralReward --> Transaction
+ReportService "1" --> "*" TransactionType
+StoreTransactionResponse --> TransactionState
+StoreTransactionResponse --> TransactionType
+Transaction --> Customer
+Transaction --> TransactionState
+Transaction --> TransactionType
+@enduml

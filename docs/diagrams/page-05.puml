@@ -1,0 +1,88 @@
+@startuml
+!pragma layout smetana
+skinparam dpi 96
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam classFontSize 12
+skinparam classAttributeFontSize 10
+skinparam ArrowColor #546E7A
+skinparam classBorderColor #37474F
+skinparam classBackgroundColor #FFFFFF
+skinparam packageBorderColor #90A4AE
+skinparam packageBackgroundColor #FAFAFA
+skinparam packageFontSize 13
+skinparam packageFontStyle bold
+skinparam nodesep 22
+skinparam ranksep 40
+hide empty members
+
+package "api.coupon.repository" {
+  interface CouponRedemptionRequestRepository #E8F5E9 {
+  }
+}
+package "api.ecom.repository" {
+  interface EcomUserRepository #E8F5E9 {
+  }
+}
+package "api.store.repository" {
+  interface HierarchyPromotionRepository #E8F5E9 {
+  }
+  interface StorePointsPromotionRepository #E8F5E9 {
+  }
+  interface StoreUserRepository #E8F5E9 {
+  }
+}
+package "idempotency" {
+  class IdempotencyReservationService #EDE7F6 {
+    - idempotentOperationRepository : IdempotentOperationRepository
+    + find() : Optional<IdempotentOperation>
+    + reserve() : Optional<IdempotentOperation>
+    + complete() : void
+    + release() : void
+  }
+  class IdempotencyService #EDE7F6 {
+    - MAX_KEY_LENGTH : int
+    - reservationService : IdempotencyReservationService
+    - idempotentOperationRepository : IdempotentOperationRepository
+    + execute() : T
+    + purgeOlderThan() : int
+  }
+  class IdempotentOperation #FFFFFF {
+    - id : Long
+    - operation : String
+    - idempotencyKey : String
+    - requestFingerprint : String
+    - resultId : Long
+    - createdAt : LocalDateTime
+    + onCreate() : void
+  }
+  interface IdempotentOperationRepository #E8F5E9 {
+  }
+}
+package "powiazania spoza tej strony" #F0F0F0 {
+  class CouponService #F0F0F0
+  class EcomUserDetailsService #F0F0F0
+  class EcomUserSeeder #F0F0F0
+  class HierarchyPromotionService #F0F0F0
+  class LoyaltyService #F0F0F0
+  class MaintenanceJobs #F0F0F0
+  class StorePromotionService #F0F0F0
+  class StoreUserDetailsService #F0F0F0
+  class StoreUserSeeder #F0F0F0
+}
+CouponService --> CouponRedemptionRequestRepository
+EcomUserDetailsService --> EcomUserRepository
+EcomUserSeeder --> EcomUserRepository
+HierarchyPromotionService --> HierarchyPromotionRepository
+IdempotencyReservationService --> IdempotentOperationRepository
+IdempotencyService --> IdempotencyReservationService
+IdempotencyService --> IdempotentOperationRepository
+LoyaltyService --> HierarchyPromotionRepository
+LoyaltyService --> IdempotencyService
+LoyaltyService --> StorePointsPromotionRepository
+MaintenanceJobs --> IdempotencyService
+StorePromotionService --> StorePointsPromotionRepository
+StoreUserDetailsService --> StoreUserRepository
+StoreUserSeeder --> StoreUserRepository
+@enduml

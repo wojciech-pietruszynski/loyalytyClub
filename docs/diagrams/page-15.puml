@@ -1,0 +1,114 @@
+@startuml
+!pragma layout smetana
+skinparam dpi 96
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam classFontSize 12
+skinparam classAttributeFontSize 10
+skinparam ArrowColor #546E7A
+skinparam classBorderColor #37474F
+skinparam classBackgroundColor #FFFFFF
+skinparam packageBorderColor #90A4AE
+skinparam packageBackgroundColor #FAFAFA
+skinparam packageFontSize 13
+skinparam packageFontStyle bold
+skinparam nodesep 22
+skinparam ranksep 40
+hide empty members
+
+package "security" {
+  class AuthenticationTokenService #EDE7F6 {
+    - authenticationManager : AuthenticationManager
+    - jwtService : JwtService
+    - tokenRevocationService : TokenRevocationService
+    + login() : IssuedToken
+    + loginAsAny() : IssuedToken
+    + refresh() : IssuedToken
+    + logout() : void
+    + issue() : IssuedToken
+    + hasAuthority() : boolean
+    + IssuedToken() : record
+  }
+  class RevokedToken #FFFFFF {
+    - id : Long
+    - tokenId : String
+    - username : String
+    - expiresAt : LocalDateTime
+    - revokedAt : LocalDateTime
+    + onCreate() : void
+  }
+  interface RevokedTokenRepository #E8F5E9 {
+  }
+  class TokenRevocationService #EDE7F6 {
+    - revokedTokenRepository : RevokedTokenRepository
+    - userTokenCutoffRepository : UserTokenCutoffRepository
+    + revokeToken() : void
+    + revokeAllTokensFor() : void
+    + isRevoked() : boolean
+    + purgeExpired() : int
+  }
+  class UserTokenCutoff #FFFFFF {
+    - id : Long
+    - username : String
+    - notBefore : LocalDateTime
+    - reason : String
+  }
+  interface UserTokenCutoffRepository #E8F5E9 {
+  }
+}
+package "util" {
+  class CouponCodeGenerator #FFFFFF {
+    - secureRandom : SecureRandom
+    + generateElevenDigits() : String
+  }
+  class PasswordGenerator #FFFFFF {
+    - UPPERCASE : String
+    - LOWERCASE : String
+    - DIGITS : String
+    - SPECIAL : String
+    - ALL : String
+    - DEFAULT_LENGTH : int
+    - secureRandom : SecureRandom
+    + generate() : String
+    + generate() : String
+  }
+  class PasswordPolicy #FFFFFF {
+    - MIN_LENGTH : int
+    - MAX_LENGTH : int
+    + validate() : void
+  }
+  class ReferralCodeGenerator #FFFFFF {
+    - ALPHABET : String
+    - secureRandom : SecureRandom
+    + generate() : String
+  }
+}
+package "powiazania spoza tej strony" #F0F0F0 {
+  class AccountService #F0F0F0
+  class AuthController #F0F0F0
+  class CouponService #F0F0F0
+  class EcomAuthController #F0F0F0
+  class JwtAuthFilter #F0F0F0
+  class JwtService #F0F0F0
+  class LoyaltyService #F0F0F0
+  class MaintenanceJobs #F0F0F0
+  class StoreAuthController #F0F0F0
+  class TechnicalUserService #F0F0F0
+}
+AccountService --> TokenRevocationService
+AuthController --> AuthenticationTokenService
+AuthenticationTokenService --> JwtService
+AuthenticationTokenService --> TokenRevocationService
+CouponService --> CouponCodeGenerator
+EcomAuthController --> AuthenticationTokenService
+JwtAuthFilter --> TokenRevocationService
+LoyaltyService --> CouponCodeGenerator
+LoyaltyService --> ReferralCodeGenerator
+MaintenanceJobs --> TokenRevocationService
+StoreAuthController --> AuthenticationTokenService
+TechnicalUserService --> PasswordGenerator
+TechnicalUserService --> TokenRevocationService
+TokenRevocationService --> RevokedTokenRepository
+TokenRevocationService --> UserTokenCutoffRepository
+@enduml

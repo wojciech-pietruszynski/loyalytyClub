@@ -1,0 +1,69 @@
+@startuml
+!pragma layout smetana
+skinparam dpi 96
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam classFontSize 12
+skinparam classAttributeFontSize 10
+skinparam ArrowColor #546E7A
+skinparam classBorderColor #37474F
+skinparam classBackgroundColor #FFFFFF
+skinparam packageBorderColor #90A4AE
+skinparam packageBackgroundColor #FAFAFA
+skinparam packageFontSize 13
+skinparam packageFontStyle bold
+skinparam nodesep 22
+skinparam ranksep 40
+hide empty members
+
+package "api.admin.repository" {
+  interface CustomerRepository #E8F5E9 {
+  }
+  interface LoyaltyTierRepository #E8F5E9 {
+  }
+  interface ReferralRewardRepository #E8F5E9 {
+  }
+  interface TechnicalUserRepository #E8F5E9 {
+  }
+  interface TransactionRepository #E8F5E9 {
+  }
+}
+package "powiazania spoza tej strony" #F0F0F0 {
+  class AccountService #F0F0F0
+  class AdminUserDetailsService #F0F0F0
+  class AuthController #F0F0F0
+  class CouponService #F0F0F0
+  class CustomerPointsService #F0F0F0
+  class CustomerPrivacyService #F0F0F0
+  class EcomService #F0F0F0
+  class LoyaltyService #F0F0F0
+  class LoyaltyTierService #F0F0F0
+  class PointExpiryNotificationService #F0F0F0
+  class ReferralRewardService #F0F0F0
+  class ReportService #F0F0F0
+  class StoreTransactionService #F0F0F0
+  class TechnicalUserService #F0F0F0
+}
+AccountService --> TechnicalUserRepository
+AdminUserDetailsService --> TechnicalUserRepository
+AuthController --> TechnicalUserRepository
+CouponService --> CustomerRepository
+CouponService --> TransactionRepository
+CustomerPointsService --> CustomerRepository
+CustomerPointsService --> TransactionRepository
+CustomerPrivacyService --> CustomerRepository
+EcomService --> CustomerRepository
+EcomService --> TransactionRepository
+LoyaltyService --> CustomerRepository
+LoyaltyService --> TransactionRepository
+LoyaltyTierService --> LoyaltyTierRepository
+PointExpiryNotificationService --> TransactionRepository
+ReferralRewardService --> ReferralRewardRepository
+ReferralRewardService --> TransactionRepository
+ReportService --> CustomerRepository
+ReportService --> TransactionRepository
+StoreTransactionService --> CustomerRepository
+StoreTransactionService --> TransactionRepository
+TechnicalUserService --> TechnicalUserRepository
+@enduml
