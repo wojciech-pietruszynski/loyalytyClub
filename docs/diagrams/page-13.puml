@@ -1,0 +1,80 @@
+@startuml
+!pragma layout smetana
+skinparam dpi 96
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam classFontSize 12
+skinparam classAttributeFontSize 10
+skinparam ArrowColor #546E7A
+skinparam classBorderColor #37474F
+skinparam classBackgroundColor #FFFFFF
+skinparam packageBorderColor #90A4AE
+skinparam packageBackgroundColor #FAFAFA
+skinparam packageFontSize 13
+skinparam packageFontStyle bold
+skinparam nodesep 22
+skinparam ranksep 40
+hide empty members
+
+package "(root)" {
+  class LoyaltyClubApplication #FFFFFF {
+    + main() : void
+  }
+}
+package "config" {
+  class MaintenanceJobs #FFFFFF {
+    - IDEMPOTENCY_RETENTION_DAYS : int
+    - customerCouponRepository : CustomerCouponRepository
+    - pointExpiryNotificationService : PointExpiryNotificationService
+    - tokenRevocationService : TokenRevocationService
+    - idempotencyService : IdempotencyService
+    + markLapsedCouponsAsExpired() : void
+    + sendPointExpiryNotifications() : void
+    + purgeRevokedTokens() : void
+    + purgeIdempotencyKeys() : void
+  }
+  class OpenApiConfig #ECEFF1 {
+    + loyaltyClubOpenApi() : OpenAPI
+    + adminApi() : GroupedOpenApi
+    + storeApi() : GroupedOpenApi
+    + ecomApi() : GroupedOpenApi
+  }
+  class PointExpiryProperties #ECEFF1 {
+    - enabled : Boolean
+    - noticeDays : List<Integer>
+    - minimumPoints : Integer
+  }
+  class ReferralProperties #ECEFF1 {
+    - enabled : Boolean
+    - minimumPurchaseAmount : BigDecimal
+    - referrerPoints : Integer
+    - referredPoints : Integer
+    - maxRewardsPerReferrer : Integer
+    - qualifyingWindowDays : Integer
+    - validityDays : Integer
+  }
+  class SecurityConfig #ECEFF1 {
+    - OPENAPI_PATHS : String[]
+    + corsConfigurationSource() : CorsConfigurationSource
+    + adminAuthenticationProvider() : DaoAuthenticationProvider
+    + storeAuthenticationProvider() : DaoAuthenticationProvider
+    + ecomAuthenticationProvider() : DaoAuthenticationProvider
+    + passwordEncoder() : PasswordEncoder
+    + authenticationManager() : AuthenticationManager
+  }
+}
+package "powiazania spoza tej strony" #F0F0F0 {
+  class CustomerCouponRepository #F0F0F0
+  class IdempotencyService #F0F0F0
+  class PointExpiryNotificationService #F0F0F0
+  class ReferralRewardService #F0F0F0
+  class TokenRevocationService #F0F0F0
+}
+MaintenanceJobs --> CustomerCouponRepository
+MaintenanceJobs --> IdempotencyService
+MaintenanceJobs --> PointExpiryNotificationService
+MaintenanceJobs --> TokenRevocationService
+PointExpiryNotificationService --> PointExpiryProperties
+ReferralRewardService --> ReferralProperties
+@enduml

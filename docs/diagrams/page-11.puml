@@ -1,0 +1,116 @@
+@startuml
+!pragma layout smetana
+skinparam dpi 96
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam classFontSize 12
+skinparam classAttributeFontSize 10
+skinparam ArrowColor #546E7A
+skinparam classBorderColor #37474F
+skinparam classBackgroundColor #FFFFFF
+skinparam packageBorderColor #90A4AE
+skinparam packageBackgroundColor #FAFAFA
+skinparam packageFontSize 13
+skinparam packageFontStyle bold
+skinparam nodesep 22
+skinparam ranksep 40
+hide empty members
+
+package "api.admin.dto" {
+  class PointsRequest #E3F2FD {
+    - points : Integer
+    - description : String
+  }
+  class PurchaseHistoryDto #E3F2FD {
+    - points : List<PurchaseHistoryPointDto>
+    - maxTotal : int
+  }
+  class PurchaseHistoryPointDto #E3F2FD {
+    - date : String
+    - total : int
+  }
+  class ReferralRewardDto #E3F2FD {
+    - id : Long
+    - referredCustomerId : Long
+    - referredCustomerNumber : String
+    - referredCustomerName : String
+    - referrerPoints : Integer
+    - referredPoints : Integer
+    - country : String
+    - awardedAt : LocalDateTime
+  }
+  class ReportsSummaryDto #E3F2FD {
+    - scope : String
+    - customerCount : long
+    - totalLoyaltyPoints : long
+    - transactionsLast30Days : long
+    - availablePoints : long
+    - pendingPoints : long
+    - expiredPoints : long
+    + of() : ReportsSummaryDto
+  }
+  class StorePromotionCreateRequest #E3F2FD {
+    - name : String
+    - country : String
+    - pointsPerCurrency : BigDecimal
+    - startsAt : LocalDateTime
+    - endsAt : LocalDateTime
+    - enabled : Boolean
+  }
+  class StorePromotionDto #E3F2FD {
+    - id : Long
+    - name : String
+    - country : String
+    - pointsPerCurrency : BigDecimal
+    - startsAt : LocalDateTime
+    - endsAt : LocalDateTime
+    - enabled : boolean
+  }
+  class StorePromotionStatusRequest #E3F2FD {
+    - enabled : Boolean
+  }
+  class TechnicalUserCreateRequest #E3F2FD {
+    - username : String
+    - password : String
+    - country : String
+    - enabled : Boolean
+  }
+  class TechnicalUserDto #E3F2FD {
+    - id : Long
+    - username : String
+    - country : String
+    - enabled : boolean
+    - passwordChangedAt : LocalDateTime
+    - oneTimePassword : String
+  }
+  class TechnicalUserPasswordRequest #E3F2FD {
+    - password : String
+  }
+  class TechnicalUserStatusRequest #E3F2FD {
+    - enabled : Boolean
+  }
+  class TransactionDto #E3F2FD {
+    - id : Long
+    - points : Integer
+    - description : String
+    - timestamp : LocalDateTime
+    - availableFrom : LocalDateTime
+    - type : String
+    - state : String
+    - amount : BigDecimal
+    - expiresAt : LocalDateTime
+  }
+}
+package "api.common.dto" {
+  class PageRequests #E3F2FD {
+    - DEFAULT_PAGE_SIZE : int
+    - MAX_PAGE_SIZE : int
+    + of() : Pageable
+  }
+  class PageResponse #E3F2FD {
+    + of() : PageResponse<T>
+  }
+}
+PurchaseHistoryDto "1" --> "*" PurchaseHistoryPointDto
+@enduml

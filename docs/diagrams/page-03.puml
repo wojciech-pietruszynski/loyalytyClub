@@ -1,0 +1,53 @@
+@startuml
+!pragma layout smetana
+skinparam dpi 96
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam classFontSize 12
+skinparam classAttributeFontSize 10
+skinparam ArrowColor #546E7A
+skinparam classBorderColor #37474F
+skinparam classBackgroundColor #FFFFFF
+skinparam packageBorderColor #90A4AE
+skinparam packageBackgroundColor #FAFAFA
+skinparam packageFontSize 13
+skinparam packageFontStyle bold
+skinparam nodesep 22
+skinparam ranksep 40
+hide empty members
+
+package "api.admin.repository" {
+  interface AdminUserRepository #E8F5E9 {
+  }
+  interface CouponPrefixRepository #E8F5E9 {
+  }
+  interface CouponTemplateRepository #E8F5E9 {
+  }
+  interface CustomerCouponRepository #E8F5E9 {
+  }
+}
+package "powiazania spoza tej strony" #F0F0F0 {
+  class AccountService #F0F0F0
+  class AdminUserDetailsService #F0F0F0
+  class AdminUserSeeder #F0F0F0
+  class CouponPrefixSeeder #F0F0F0
+  class CouponService #F0F0F0
+  class CouponTemplateSeeder #F0F0F0
+  class EcomService #F0F0F0
+  class LoyaltyService #F0F0F0
+  class MaintenanceJobs #F0F0F0
+}
+AccountService --> AdminUserRepository
+AdminUserDetailsService --> AdminUserRepository
+AdminUserSeeder --> AdminUserRepository
+CouponPrefixSeeder --> CouponPrefixRepository
+CouponService --> CouponTemplateRepository
+CouponService --> CustomerCouponRepository
+CouponTemplateSeeder --> CouponTemplateRepository
+EcomService --> CustomerCouponRepository
+LoyaltyService --> CouponPrefixRepository
+LoyaltyService --> CouponTemplateRepository
+LoyaltyService --> CustomerCouponRepository
+MaintenanceJobs --> CustomerCouponRepository
+@enduml

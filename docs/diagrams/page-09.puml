@@ -1,0 +1,75 @@
+@startuml
+!pragma layout smetana
+skinparam dpi 96
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam classFontSize 12
+skinparam classAttributeFontSize 10
+skinparam ArrowColor #546E7A
+skinparam classBorderColor #37474F
+skinparam classBackgroundColor #FFFFFF
+skinparam packageBorderColor #90A4AE
+skinparam packageBackgroundColor #FAFAFA
+skinparam packageFontSize 13
+skinparam packageFontStyle bold
+skinparam nodesep 22
+skinparam ranksep 40
+hide empty members
+
+package "api.store.security" {
+  class StoreUserDetailsService #EDE7F6 {
+    - storeUserRepository : StoreUserRepository
+    + loadUserByUsername() : UserDetails
+  }
+}
+package "api.store.service" {
+  class HierarchyPromotionService #EDE7F6 {
+    - hierarchyPromotionRepository : HierarchyPromotionRepository
+    + getActivePromotions() : List<HierarchyPromotion>
+    + isItemExcluded() : boolean
+    + resolveItemMultiplier() : BigDecimal
+  }
+  class StorePromotionService #EDE7F6 {
+    - storePointsPromotionRepository : StorePointsPromotionRepository
+    - defaultPointsPerCurrency : BigDecimal
+    + resolvePointsPerCurrency() : BigDecimal
+  }
+  class StoreTransactionService #EDE7F6 {
+    - ZERO : BigDecimal
+    - customerRepository : CustomerRepository
+    - transactionRepository : TransactionRepository
+    - storePromotionService : StorePromotionService
+    - hierarchyPromotionService : HierarchyPromotionService
+    - customerPointsService : CustomerPointsService
+    - referralRewardService : ReferralRewardService
+    + registerSale() : StoreTransactionResponse
+    + registerReturn() : StoreTransactionResponse
+    + getPointsBalance() : StorePointsBalanceResponse
+  }
+}
+package "powiazania spoza tej strony" #F0F0F0 {
+  class CustomerPointsService #F0F0F0
+  class CustomerRepository #F0F0F0
+  class EcomService #F0F0F0
+  class HierarchyPromotionRepository #F0F0F0
+  class JwtAuthFilter #F0F0F0
+  class ReferralRewardService #F0F0F0
+  class StoreController #F0F0F0
+  class StorePointsPromotionRepository #F0F0F0
+  class StoreUserRepository #F0F0F0
+  class TransactionRepository #F0F0F0
+}
+EcomService --> StoreTransactionService
+HierarchyPromotionService --> HierarchyPromotionRepository
+JwtAuthFilter --> StoreUserDetailsService
+StoreController --> StoreTransactionService
+StorePromotionService --> StorePointsPromotionRepository
+StoreTransactionService --> CustomerPointsService
+StoreTransactionService --> CustomerRepository
+StoreTransactionService --> HierarchyPromotionService
+StoreTransactionService --> ReferralRewardService
+StoreTransactionService --> StorePromotionService
+StoreTransactionService --> TransactionRepository
+StoreUserDetailsService --> StoreUserRepository
+@enduml

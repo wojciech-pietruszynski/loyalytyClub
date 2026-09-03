@@ -1,0 +1,155 @@
+@startuml
+!pragma layout smetana
+skinparam dpi 96
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam classFontSize 12
+skinparam classAttributeFontSize 10
+skinparam ArrowColor #546E7A
+skinparam classBorderColor #37474F
+skinparam classBackgroundColor #FFFFFF
+skinparam packageBorderColor #90A4AE
+skinparam packageBackgroundColor #FAFAFA
+skinparam packageFontSize 13
+skinparam packageFontStyle bold
+skinparam nodesep 22
+skinparam ranksep 40
+hide empty members
+
+package "api.admin.dto" {
+  class AdminAuditLogDto #E3F2FD {
+    - id : Long
+    - timestamp : LocalDateTime
+    - username : String
+    - role : String
+    - action : String
+    - resourceType : String
+    - resourceId : String
+  }
+  class ChangePasswordRequest #E3F2FD {
+    - currentPassword : String
+    - newPassword : String
+  }
+  class CouponIssueRequest #E3F2FD {
+    - customerId : Long
+    - couponTemplateId : Long
+    - reason : CouponReason
+  }
+  class CouponTemplateCreateRequest #E3F2FD {
+    - couponValue : BigDecimal
+    - minimumPurchaseValue : BigDecimal
+    - requiredPoints : Integer
+    - country : String
+    - validityDays : Integer
+    - couponPrefix : String
+  }
+  class CouponTemplateDto #E3F2FD {
+    - id : Long
+    - couponValue : BigDecimal
+    - minimumPurchaseValue : BigDecimal
+    - requiredPoints : Integer
+    - country : String
+    - validityDays : Integer
+    - couponPrefix : String
+  }
+  class CustomerCouponDto #E3F2FD {
+    - id : Long
+    - couponCode : String
+    - customerId : Long
+    - customerName : String
+    - country : String
+    - couponValue : BigDecimal
+    - minimumPurchaseValue : BigDecimal
+    - requiredPoints : Integer
+    - validityDays : Integer
+    - couponPrefix : String
+    - reason : String
+    - status : String
+    - issuedAt : LocalDateTime
+    - expiresAt : LocalDateTime
+  }
+  class CustomerDto #E3F2FD {
+    - id : Long
+    - firstName : String
+    - lastName : String
+    - email : String
+    - customerNumber : String
+    - phoneNumber : String
+    - country : String
+    - loyaltyPoints : Integer
+    - lifetimePoints : Integer
+    - status : String
+    - createdAt : LocalDateTime
+    - referrerCustomerNumber : String
+    - referralCode : String
+    - loyaltyTierCode : String
+  }
+  class CustomerStatusRequest #E3F2FD {
+    - status : CustomerStatus
+  }
+  class ExpiringPointsDto #E3F2FD {
+    - transactionId : Long
+    - customerId : Long
+    - customerNumber : String
+    - country : String
+    - points : Integer
+    - expiresAt : LocalDateTime
+  }
+  class HierarchyPromotionCreateRequest #E3F2FD {
+    - name : String
+    - country : String
+    - hierarchy : String
+    - productClass : String
+    - subclass : String
+    - type : HierarchyPromotionType
+    - multiplier : BigDecimal
+    - startsAt : LocalDateTime
+    - endsAt : LocalDateTime
+    - enabled : Boolean
+  }
+  class HierarchyPromotionDto #E3F2FD {
+    - id : Long
+    - name : String
+    - country : String
+    - hierarchy : String
+    - productClass : String
+    - subclass : String
+    - type : HierarchyPromotionType
+    - multiplier : BigDecimal
+    - startsAt : LocalDateTime
+    - endsAt : LocalDateTime
+    - enabled : boolean
+  }
+  class LoginRequest #E3F2FD {
+    - username : String
+    - password : String
+  }
+  class LoginResponse #E3F2FD {
+    - token : String
+    - expiresAt : long
+    - role : String
+    - country : String
+  }
+  class PersonalDataExportDto #E3F2FD {
+    - generatedAt : LocalDateTime
+    - profile : Profile
+    - transactions : List<TransactionEntry>
+    - coupons : List<CouponEntry>
+    - referrals : List<ReferralEntry>
+    + Profile() : record
+    + TransactionEntry() : record
+    + CouponEntry() : record
+    + ReferralEntry() : record
+  }
+}
+package "powiazania spoza tej strony" #F0F0F0 {
+  class CouponReason #F0F0F0
+  class CustomerStatus #F0F0F0
+  class HierarchyPromotionType #F0F0F0
+}
+CouponIssueRequest --> CouponReason
+CustomerStatusRequest --> CustomerStatus
+HierarchyPromotionCreateRequest --> HierarchyPromotionType
+HierarchyPromotionDto --> HierarchyPromotionType
+@enduml

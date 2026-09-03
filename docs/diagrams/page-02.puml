@@ -1,0 +1,100 @@
+@startuml
+!pragma layout smetana
+skinparam dpi 96
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam classFontSize 12
+skinparam classAttributeFontSize 10
+skinparam ArrowColor #546E7A
+skinparam classBorderColor #37474F
+skinparam classBackgroundColor #FFFFFF
+skinparam packageBorderColor #90A4AE
+skinparam packageBackgroundColor #FAFAFA
+skinparam packageFontSize 13
+skinparam packageFontStyle bold
+skinparam nodesep 22
+skinparam ranksep 40
+hide empty members
+
+package "api.coupon.model" {
+  class CouponRedemptionRequest #FFF3C4 {
+    - id : Long
+    - idempotencyKey : String
+    - customerNumber : String
+    - couponTemplateId : Long
+    - customerCoupon : CustomerCoupon
+    - createdAt : LocalDateTime
+    + onCreate() : void
+  }
+  enum CouponValidationStatus #FFECB3 {
+    VALID
+    COUPON_NOT_FOUND
+    CUSTOMER_NOT_FOUND
+    COUPON_BELONGS_TO_ANOTHER_ACCOUNT
+    COUPON_ALREADY_USED
+    COUPON_EXPIRED
+    COUPON_CANCELLED
+    CUSTOMER_NOT_ACTIVE
+  }
+}
+package "api.ecom.model" {
+  class EcomUser #FFF3C4 {
+  }
+}
+package "api.store.model" {
+  class HierarchyPromotion #FFF3C4 {
+    - id : Long
+    - name : String
+    - country : String
+    - hierarchy : String
+    - productClass : String
+    - subclass : String
+    - type : HierarchyPromotionType
+    - multiplier : BigDecimal
+    - startsAt : LocalDateTime
+    - endsAt : LocalDateTime
+    - enabled : boolean
+  }
+  enum HierarchyPromotionType #FFECB3 {
+    MULTIPLIER
+    EXCLUSION
+  }
+  class StorePointsPromotion #FFF3C4 {
+    - id : Long
+    - name : String
+    - country : String
+    - pointsPerCurrency : BigDecimal
+    - startsAt : LocalDateTime
+    - endsAt : LocalDateTime
+    - enabled : boolean
+  }
+  class StoreUser #FFF3C4 {
+  }
+}
+package "model" {
+  class BaseUser #FFF3C4 {
+    - id : Long
+    - username : String
+    - password : String
+    - passwordChangedAt : LocalDateTime
+    - enabled : boolean
+    + onCreate() : void
+  }
+}
+package "powiazania spoza tej strony" #F0F0F0 {
+  class AdminUser #F0F0F0
+  class CouponValidationResponse #F0F0F0
+  class CustomerCoupon #F0F0F0
+  class HierarchyPromotionCreateRequest #F0F0F0
+  class HierarchyPromotionDto #F0F0F0
+}
+BaseUser <|-- AdminUser
+BaseUser <|-- EcomUser
+BaseUser <|-- StoreUser
+CouponRedemptionRequest --> CustomerCoupon
+CouponValidationResponse --> CouponValidationStatus
+HierarchyPromotion --> HierarchyPromotionType
+HierarchyPromotionCreateRequest --> HierarchyPromotionType
+HierarchyPromotionDto --> HierarchyPromotionType
+@enduml

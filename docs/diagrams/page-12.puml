@@ -1,0 +1,135 @@
+@startuml
+!pragma layout smetana
+skinparam dpi 96
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam classFontSize 12
+skinparam classAttributeFontSize 10
+skinparam ArrowColor #546E7A
+skinparam classBorderColor #37474F
+skinparam classBackgroundColor #FFFFFF
+skinparam packageBorderColor #90A4AE
+skinparam packageBackgroundColor #FAFAFA
+skinparam packageFontSize 13
+skinparam packageFontStyle bold
+skinparam nodesep 22
+skinparam ranksep 40
+hide empty members
+
+package "api.coupon.dto" {
+  class CouponDefinitionResponse #E3F2FD {
+    - couponTemplateId : Long
+    - couponValue : BigDecimal
+    - minimumPurchaseValue : BigDecimal
+    - requiredPoints : Integer
+    - validityDays : Integer
+    - couponPrefix : String
+    - country : String
+  }
+  class CouponRedeemRequest #E3F2FD {
+    - customerNumber : String
+    - couponTemplateId : Long
+  }
+  class CouponRedeemResponse #E3F2FD {
+    - couponCode : String
+    - customerNumber : String
+    - status : String
+    - issuedAt : LocalDateTime
+    - expiresAt : LocalDateTime
+    - definition : CouponDefinitionResponse
+  }
+  class CouponValidationResponse #E3F2FD {
+    - status : CouponValidationStatus
+    - couponCode : String
+    - customerNumber : String
+    - couponStatus : String
+    - issuedAt : LocalDateTime
+    - expiresAt : LocalDateTime
+    - definition : CouponDefinitionResponse
+  }
+}
+package "api.ecom.dto" {
+  class EcomCustomerProfileDto #E3F2FD {
+    - customerId : Long
+    - customerNumber : String
+    - firstName : String
+    - lastName : String
+    - email : String
+    - phoneNumber : String
+    - country : String
+    - loyaltyPoints : Integer
+    - lifetimePoints : Integer
+    - loyaltyTierCode : String
+    - referralCode : String
+    - status : String
+  }
+}
+package "api.store.dto" {
+  class HierarchyRequest #E3F2FD {
+    - hierarchy : String
+    - productClass : String
+    - subclass : String
+  }
+  class StoreItemPriceRequest #E3F2FD {
+    - amount : BigDecimal
+    - currency : String
+  }
+  class StorePointsBalanceResponse #E3F2FD {
+    - customerId : Long
+    - customerNumber : String
+    - pendingPoints : Integer
+    - availablePoints : Integer
+    - expiredPoints : Integer
+  }
+  class StoreReturnRequest #E3F2FD {
+    - customerNumber : String
+    - items : List<StoreTransactionItemRequest>
+    - totalAmount : BigDecimal
+    - sourceTransactionNumber : String
+    - saleTransactionNumber : String
+    - purchaseTimestamp : LocalDateTime
+  }
+  class StoreSaleRequest #E3F2FD {
+    - customerNumber : String
+    - items : List<StoreTransactionItemRequest>
+    - totalAmount : BigDecimal
+    - sourceTransactionNumber : String
+    - purchaseTimestamp : LocalDateTime
+  }
+  class StoreTransactionItemRequest #E3F2FD {
+    - cartPosition : String
+    - ean : String
+    - name : String
+    - hierarchy : HierarchyRequest
+    - price : StoreItemPriceRequest
+  }
+  class StoreTransactionResponse #E3F2FD {
+    - transactionId : Long
+    - customerId : Long
+    - customerNumber : String
+    - type : TransactionType
+    - state : TransactionState
+    - points : Integer
+    - amount : BigDecimal
+    - pointsPerCurrency : BigDecimal
+    - purchaseTimestamp : LocalDateTime
+    - availableFrom : LocalDateTime
+    - expiresAt : LocalDateTime
+  }
+}
+package "powiazania spoza tej strony" #F0F0F0 {
+  class CouponValidationStatus #F0F0F0
+  class TransactionState #F0F0F0
+  class TransactionType #F0F0F0
+}
+CouponRedeemResponse --> CouponDefinitionResponse
+CouponValidationResponse --> CouponDefinitionResponse
+CouponValidationResponse --> CouponValidationStatus
+StoreReturnRequest "1" --> "*" StoreTransactionItemRequest
+StoreSaleRequest "1" --> "*" StoreTransactionItemRequest
+StoreTransactionItemRequest --> HierarchyRequest
+StoreTransactionItemRequest --> StoreItemPriceRequest
+StoreTransactionResponse --> TransactionState
+StoreTransactionResponse --> TransactionType
+@enduml

@@ -1,0 +1,153 @@
+@startuml
+!pragma layout smetana
+skinparam dpi 96
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam classFontSize 12
+skinparam classAttributeFontSize 10
+skinparam ArrowColor #546E7A
+skinparam classBorderColor #37474F
+skinparam classBackgroundColor #FFFFFF
+skinparam packageBorderColor #90A4AE
+skinparam packageBackgroundColor #FAFAFA
+skinparam packageFontSize 13
+skinparam packageFontStyle bold
+skinparam nodesep 22
+skinparam ranksep 40
+hide empty members
+
+package "api.coupon.controller" {
+  class CouponController #FFE0E6 {
+    - couponService : CouponService
+    + redeemPoints() : CouponRedeemResponse
+    + validateCoupon() : CouponValidationResponse
+  }
+}
+package "api.coupon.service" {
+  class CouponService #EDE7F6 {
+    - couponCodeGenerator : CouponCodeGenerator
+    - customerRepository : CustomerRepository
+    - couponTemplateRepository : CouponTemplateRepository
+    - customerCouponRepository : CustomerCouponRepository
+    - transactionRepository : TransactionRepository
+    - couponRedemptionRequestRepository : CouponRedemptionRequestRepository
+    - customerPointsService : CustomerPointsService
+    + redeemPointsForCoupon() : CouponRedeemResponse
+    + validateCoupon() : CouponValidationResponse
+  }
+}
+package "api.ecom.config" {
+  class EcomUserSeeder #ECEFF1 {
+    - ECOM_USERNAME : String
+    - ECOM_PASSWORD : String
+    - ecomUserRepository : EcomUserRepository
+    - passwordEncoder : PasswordEncoder
+    + run() : void
+  }
+}
+package "api.ecom.controller" {
+  class EcomAuthController #FFE0E6 {
+    - ROLE : String
+    - AUTHORITY : String
+    - authenticationTokenService : AuthenticationTokenService
+    + login() : ResponseEntity<LoginResponse>
+    + refresh() : ResponseEntity<LoginResponse>
+    + logout() : ResponseEntity<Void>
+  }
+  class EcomController #FFE0E6 {
+    - API_VERSION : String
+    - ecomService : EcomService
+    + info() : Map<String,String>
+    + getPoints() : StorePointsBalanceResponse
+    + getProfile() : EcomCustomerProfileDto
+    + getTransactions() : List<TransactionDto>
+    + getTransactionsPage() : PageResponse<TransactionDto>
+    + getCoupons() : List<CustomerCouponDto>
+    + getCouponsPage() : PageResponse<CustomerCouponDto>
+  }
+}
+package "api.ecom.security" {
+  class EcomUserDetailsService #EDE7F6 {
+    - ecomUserRepository : EcomUserRepository
+    + loadUserByUsername() : UserDetails
+  }
+}
+package "api.ecom.service" {
+  class EcomService #EDE7F6 {
+    - customerRepository : CustomerRepository
+    - transactionRepository : TransactionRepository
+    - customerCouponRepository : CustomerCouponRepository
+    - storeTransactionService : StoreTransactionService
+    - loyaltyTierService : LoyaltyTierService
+    + getPointsBalance() : StorePointsBalanceResponse
+    + getCustomerProfile() : EcomCustomerProfileDto
+    + getTransactions() : List<TransactionDto>
+    + getTransactions() : Page<TransactionDto>
+    + getCoupons() : List<CustomerCouponDto>
+    + getCoupons() : Page<CustomerCouponDto>
+  }
+}
+package "api.store.config" {
+  class StoreUserSeeder #ECEFF1 {
+    - STORE_USERNAME : String
+    - STORE_PASSWORD : String
+    - storeUserRepository : StoreUserRepository
+    - passwordEncoder : PasswordEncoder
+    + run() : void
+  }
+}
+package "api.store.controller" {
+  class StoreAuthController #FFE0E6 {
+    - ROLE : String
+    - AUTHORITY : String
+    - authenticationTokenService : AuthenticationTokenService
+    + login() : ResponseEntity<LoginResponse>
+    + refresh() : ResponseEntity<LoginResponse>
+    + logout() : ResponseEntity<Void>
+  }
+  class StoreController #FFE0E6 {
+    - storeTransactionService : StoreTransactionService
+    + info() : Map<String,String>
+    + registerSale() : StoreTransactionResponse
+    + registerReturn() : StoreTransactionResponse
+    + getPointsBalance() : StorePointsBalanceResponse
+  }
+}
+package "powiazania spoza tej strony" #F0F0F0 {
+  class AuthenticationTokenService #F0F0F0
+  class CouponCodeGenerator #F0F0F0
+  class CouponRedemptionRequestRepository #F0F0F0
+  class CouponTemplateRepository #F0F0F0
+  class CustomerCouponRepository #F0F0F0
+  class CustomerPointsService #F0F0F0
+  class CustomerRepository #F0F0F0
+  class EcomUserRepository #F0F0F0
+  class JwtAuthFilter #F0F0F0
+  class LoyaltyTierService #F0F0F0
+  class StoreTransactionService #F0F0F0
+  class StoreUserRepository #F0F0F0
+  class TransactionRepository #F0F0F0
+}
+CouponController --> CouponService
+CouponService --> CouponCodeGenerator
+CouponService --> CouponRedemptionRequestRepository
+CouponService --> CouponTemplateRepository
+CouponService --> CustomerCouponRepository
+CouponService --> CustomerPointsService
+CouponService --> CustomerRepository
+CouponService --> TransactionRepository
+EcomAuthController --> AuthenticationTokenService
+EcomController --> EcomService
+EcomService --> CustomerCouponRepository
+EcomService --> CustomerRepository
+EcomService --> LoyaltyTierService
+EcomService --> StoreTransactionService
+EcomService --> TransactionRepository
+EcomUserDetailsService --> EcomUserRepository
+EcomUserSeeder --> EcomUserRepository
+JwtAuthFilter --> EcomUserDetailsService
+StoreAuthController --> AuthenticationTokenService
+StoreController --> StoreTransactionService
+StoreUserSeeder --> StoreUserRepository
+@enduml
