@@ -59,6 +59,14 @@ services:
       # stoi pod innym adresem niz API.
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
       JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75 -XX:+UseG1GC}
+      # Zakladanie kont poczatkowych - domyslnie wylaczone. Hasla nie maja
+      # wartosci domyslnych w kodzie: przy wlaczonym seedowaniu i pustym hasle
+      # aplikacja nie wstanie. Wartosci pochodza z pliku .env, ktory nie jest
+      # wersjonowany (wzorzec: .env.example).
+      LOYALTYCLUB_SEED_ENABLED: ${LOYALTYCLUB_SEED_ENABLED:-false}
+      LOYALTYCLUB_SEED_ADMIN_PASSWORD: ${LOYALTYCLUB_SEED_ADMIN_PASSWORD:-}
+      LOYALTYCLUB_SEED_STORE_PASSWORD: ${LOYALTYCLUB_SEED_STORE_PASSWORD:-}
+      LOYALTYCLUB_SEED_ECOM_PASSWORD: ${LOYALTYCLUB_SEED_ECOM_PASSWORD:-}
     ports:
       - "${BACKEND_HOST_PORT:-8089}:8089"
     networks:

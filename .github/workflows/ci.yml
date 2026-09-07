@@ -100,10 +100,31 @@ jobs:
       - name: Weryfikacja migracji Liquibase
         run: |
           set -euo pipefail
-          # Pusty wolumen na starcie oznacza, ze zestaw migracji musial
-          # przejsc od zera - warto to potwierdzic wprost.
-          docker compose exec -T db \
-            psql -U user -d loyalty_db -c "select count(*) from databasechangelog;"
+          # Pusty wolumen na starcie oznacza, ze zestaw migracji musial przejsc
+          # od zera. Samo wypisanie liczby wykonanych zestawow zmian niczego
+          # jednak nie weryfikuje - psql konczy sie powodzeniem takze wtedy, gdy
+          # zwroci zero. Dlatego liczba jest odczytywana (-t bez naglowka,
+          # -A bez wyrownania) i POROWNYWANA z liczba zestawow w changelogu.
+          #
+          # Wzorzec odniesienia liczony jest z pliku changelog-master.xml, a nie
+          # wpisany jako stala: dodanie migracji bez aktualizacji tego kroku
+          # dawaloby falszywy alarm, a to najprostsza droga do wylaczenia
+          # sprawdzenia, ktore zaczelo przeszkadzac.
+          oczekiwane=$(grep -c '<changeSet ' src/main/resources/db/changelog-master.xml)
+          wykonane=$(docker compose exec -T db \
+            psql -U user -d loyalty_db -tAc "select count(*) from databasechangelog;" \
+            | tr -d '[:space:]')
+
+          echo "Zestawy zmian w changelogu: ${oczekiwane}"
+          echo "Zestawy zmian wykonane na bazie: ${wykonane}"
+
+          if [ "${wykonane}" != "${oczekiwane}" ]; then
+            echo "BLAD: na pustej bazie wykonano ${wykonane} z ${oczekiwane} zestawow zmian."
+            docker compose exec -T db \
+              psql -U user -d loyalty_db -c "select id, author, exectype from databasechangelog order by orderexecuted;"
+            exit 1
+          fi
+          echo "OK: komplet ${oczekiwane} migracji wykonal sie na pustej bazie."
 
       - name: Logi przy niepowodzeniu
         if: failure()
