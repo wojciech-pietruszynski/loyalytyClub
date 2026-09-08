@@ -68,6 +68,16 @@ jobs:
           cache-from: type=gha,scope=backend-image
           cache-to: type=gha,mode=max,scope=backend-image
 
+      - name: Klucz podpisu na czas przebiegu
+        run: |
+          set -euo pipefail
+          # JWT_SECRET nie ma wartosci domyslnej ani w application.properties,
+          # ani w docker-compose.yml - podnoszenie stosu bez tej zmiennej konczy
+          # sie bledem. Przebieg CI wystawia wlasny klucz, wazny wylacznie przez
+          # czas tego zadania; nie ma go w repozytorium i nie podpisuje tokenow
+          # zadnego dzialajacego srodowiska.
+          echo "JWT_SECRET=$(openssl rand -base64 48)" >> "$GITHUB_ENV"
+
       - name: Uruchomienie stosu
         run: |
           set -euo pipefail

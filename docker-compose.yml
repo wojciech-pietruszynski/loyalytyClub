@@ -53,7 +53,10 @@ services:
       DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-loyalty_db}
       DB_USERNAME: ${POSTGRES_USER:-user}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-password}
-      JWT_SECRET: ${JWT_SECRET:-YWRtaW5Mb3lhbHR5Q2x1YlNlY3JldEtleUFkbWluTG95YWx0eUNsdWJTZWNyZXRLZXk=}
+      # Klucz podpisu JWT nie ma wartosci domyslnej - skladnia ":?" przerywa
+      # podnoszenie uslugi z komunikatem, zamiast wystartowac z kluczem znanym
+      # z repozytorium. Wartosc pochodzi z pliku .env (wzorzec: .env.example).
+      JWT_SECRET: ${JWT_SECRET:?ustaw JWT_SECRET w pliku .env - openssl rand -base64 48}
       # Puste = frontend i API pod jednym originem (nginx frontendu przekazuje
       # /api dalej), wiec CORS nie jest potrzebny. Ustawiac tylko wtedy, gdy SPA
       # stoi pod innym adresem niz API.

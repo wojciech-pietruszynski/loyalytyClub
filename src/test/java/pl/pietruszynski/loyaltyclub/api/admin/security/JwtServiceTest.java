@@ -14,8 +14,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class JwtServiceTest {
 
-    // Base64-encoded 64-byte key (sufficient for HS512)
-    private static final String SECRET = "YWRtaW5Mb3lhbHR5Q2x1YlNlY3JldEtleUFkbWluTG95YWx0eUNsdWJTZWNyZXRLZXk=";
+    // Klucz uzywany wylacznie przez ten test, w Base64 (51 bajtow po
+    // zdekodowaniu, czyli HS384 przy doborze algorytmu z dlugosci klucza).
+    // Wartosc jest danymi testowymi i nie podpisuje tokenow zadnego
+    // dzialajacego srodowiska - klucze produkcyjne pochodza wylacznie ze
+    // zmiennej JWT_SECRET, ktora nie ma wartosci domyslnej.
+    private static final String SECRET = "a2x1Y3otand0LXV6eXdhbnktd3lsYWN6bmllLXctdGVzdGFjaC1qZWRub3N0a293eWNo";
     private static final long EXPIRATION_MS = 60_000L; // 1 minute
 
     private JwtService jwtService;
