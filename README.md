@@ -189,8 +189,17 @@ Settings are read from `.env` (see `.env.example`): ports, database
 credentials, `JWT_SECRET`. `./scripts/stack.sh down` stops the stack and keeps
 the data; `destroy` also drops the database volume.
 
-> The database port **5433** is published on the host for developer tools only.
-> The backend reaches PostgreSQL over the container network as `db:5432`.
+> `POSTGRES_PASSWORD` and `JWT_SECRET` have **no default value** — neither in
+> `application.properties` nor in `docker-compose.yml`. Without them
+> `docker compose up` fails with an explicit message instead of starting with
+> a credential taken from a public repository. Generate them with
+> `openssl rand -base64 24` and `openssl rand -base64 48`.
+
+> The database port **5433** is published on the host **loopback only**
+> (`127.0.0.1:5433:5432`), for developer tools running on the same machine.
+> The backend reaches PostgreSQL over the container network as `db:5432`, so
+> a production deployment drops the `ports` section of the `db` service
+> altogether.
 
 ### B. Local run with a JDK
 
@@ -203,14 +212,17 @@ the data; `destroy` also drops the database volume.
 ```bash
 docker compose up -d db
 ```
-This starts PostgreSQL 15 on port **5433** (container port 5432).
-Credentials: `user / password`, database: `loyalty_db`.
+This starts PostgreSQL 15 on `127.0.0.1:5433` (container port 5432) — the
+loopback interface only. User: `user`, database: `loyalty_db`; the password is
+the `POSTGRES_PASSWORD` you put in `.env` (there is no default).
 
 #### 2. Build & run
 ```bash
 mvn clean package
-java -jar target/loyalty-club-0.0.1-SNAPSHOT.jar
+DB_PASSWORD=<the POSTGRES_PASSWORD from .env> JWT_SECRET=<base64 key> java -jar target/loyalty-club-0.0.1-SNAPSHOT.jar
 ```
+`DB_PASSWORD` and `JWT_SECRET` are required: both properties are declared
+without a default, so the context fails to start when either is missing.
 The API will be available at **http://localhost:8089**
 
 ### Admin panel
@@ -247,6 +259,7 @@ Key properties in `src/main/resources/application.properties`:
 | `springdoc.api-docs.version` | `openapi_3_0` | Emitted OpenAPI version. springdoc 2.7+ defaults to 3.1; pinned to 3.0 so generated client SDKs keep reading the same contract. Remove the line to emit 3.1 |
 | `app.cors.allowed-origins` | *(empty)* | Comma-separated frontend origins allowed for CORS on `/api/**`. Empty disables CORS — override via `CORS_ALLOWED_ORIGINS` |
 | `spring.datasource.url` | `jdbc:postgresql://localhost:5433/loyalty_db` | Database URL |
+| `spring.datasource.password` | *(none)* | Database password — required, supplied via the `DB_PASSWORD` env var; a missing value aborts startup |
 
 ---
 
@@ -617,8 +630,16 @@ Ustawienia czytane są z pliku `.env` (wzorzec: `.env.example`): porty, dane
 dostępowe do bazy, `JWT_SECRET`. `./scripts/stack.sh down` zatrzymuje stos
 i zostawia dane; `destroy` usuwa też wolumen bazy.
 
-> Port bazy **5433** jest wystawiony na hosta wyłącznie dla narzędzi
-> deweloperskich. Backend sięga do PostgreSQL po sieci kontenerów, jako `db:5432`.
+> `POSTGRES_PASSWORD` i `JWT_SECRET` **nie mają wartości domyślnej** — ani
+> w `application.properties`, ani w `docker-compose.yml`. Bez nich
+> `docker compose up` kończy się jawnym komunikatem, zamiast wystartować
+> z poświadczeniem znanym z repozytorium publicznego. Wartości generuje
+> `openssl rand -base64 24` i `openssl rand -base64 48`.
+
+> Port bazy **5433** jest wystawiony na hosta **wyłącznie na pętli zwrotnej**
+> (`127.0.0.1:5433:5432`) i tylko dla narzędzi deweloperskich uruchamianych na
+> tej samej maszynie. Backend sięga do PostgreSQL po sieci kontenerów, jako
+> `db:5432`, więc wdrożenie produkcyjne usuwa sekcję `ports` usługi `db`.
 
 ### B. Uruchomienie lokalne z JDK
 
@@ -631,14 +652,17 @@ i zostawia dane; `destroy` usuwa też wolumen bazy.
 ```bash
 docker compose up -d db
 ```
-Startuje PostgreSQL 15 na porcie **5433** (port kontenera 5432).
-Dane dostępowe: `user / password`, baza: `loyalty_db`.
+Startuje PostgreSQL 15 na `127.0.0.1:5433` (port kontenera 5432), czyli
+wyłącznie na pętli zwrotnej. Użytkownik: `user`, baza: `loyalty_db`; hasłem
+jest `POSTGRES_PASSWORD` z pliku `.env` (nie ma wartości domyślnej).
 
 #### 2. Budowanie i uruchomienie
 ```bash
 mvn clean package
-java -jar target/loyalty-club-0.0.1-SNAPSHOT.jar
+DB_PASSWORD=<POSTGRES_PASSWORD z pliku .env> JWT_SECRET=<klucz base64> java -jar target/loyalty-club-0.0.1-SNAPSHOT.jar
 ```
+`DB_PASSWORD` i `JWT_SECRET` są wymagane: obie właściwości zadeklarowano bez
+wartości domyślnej, więc brak którejkolwiek przerywa wstawanie kontekstu.
 API będzie dostępne pod **http://localhost:8089**
 
 ### Panel administracyjny
@@ -675,6 +699,7 @@ Kluczowe właściwości w `src/main/resources/application.properties`:
 | `springdoc.api-docs.version` | `openapi_3_0` | Wersja generowanej specyfikacji OpenAPI. springdoc od 2.7 domyślnie generuje 3.1; przypięte do 3.0, żeby generowane biblioteki klienckie czytały ten sam kontrakt co dotąd. Usunięcie linii przełącza na 3.1 |
 | `app.cors.allowed-origins` | *(puste)* | Originy frontendu dopuszczone do CORS na `/api/**`, po przecinku. Puste = CORS wyłączony — nadpisz zmienną `CORS_ALLOWED_ORIGINS` |
 | `spring.datasource.url` | `jdbc:postgresql://localhost:5433/loyalty_db` | URL bazy danych |
+| `spring.datasource.password` | *(brak)* | Hasło bazy danych — wymagane, podawane zmienną `DB_PASSWORD`; brak wartości przerywa start aplikacji |
 
 ---
 
