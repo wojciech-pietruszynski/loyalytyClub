@@ -68,15 +68,22 @@ jobs:
           cache-from: type=gha,scope=backend-image
           cache-to: type=gha,mode=max,scope=backend-image
 
-      - name: Klucz podpisu na czas przebiegu
+      - name: Poswiadczenia na czas przebiegu
         run: |
           set -euo pipefail
-          # JWT_SECRET nie ma wartosci domyslnej ani w application.properties,
-          # ani w docker-compose.yml - podnoszenie stosu bez tej zmiennej konczy
-          # sie bledem. Przebieg CI wystawia wlasny klucz, wazny wylacznie przez
-          # czas tego zadania; nie ma go w repozytorium i nie podpisuje tokenow
-          # zadnego dzialajacego srodowiska.
-          echo "JWT_SECRET=$(openssl rand -base64 48)" >> "$GITHUB_ENV"
+          # Ani JWT_SECRET, ani POSTGRES_PASSWORD nie maja wartosci domyslnej -
+          # ani w application.properties, ani w docker-compose.yml - wiec
+          # podnoszenie stosu bez tych zmiennych konczy sie bledem. Przebieg CI
+          # wystawia wlasne wartosci, wazne wylacznie przez czas tego zadania;
+          # nie ma ich w repozytorium i nie chronia zadnego dzialajacego
+          # srodowiska. Baza powstaje razem ze stosem i ginie w kroku
+          # sprzatajacym, wiec haslo losowane jest na kazdy przebieg.
+          klucz_jwt=$(openssl rand -base64 48)
+          echo "::add-mask::${klucz_jwt}"
+          echo "JWT_SECRET=${klucz_jwt}" >> "$GITHUB_ENV"
+          haslo_bazy=$(openssl rand -base64 24)
+          echo "::add-mask::${haslo_bazy}"
+          echo "POSTGRES_PASSWORD=${haslo_bazy}" >> "$GITHUB_ENV"
 
       - name: Uruchomienie stosu
         run: |

@@ -19,11 +19,20 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-loyalty_db}
       POSTGRES_USER: ${POSTGRES_USER:-user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      # Haslo bazy nie ma wartosci domyslnej - skladnia ":?" przerywa
+      # podnoszenie uslugi z komunikatem, zamiast zalozyc klaster z haslem
+      # znanym z repozytorium. Ta sama regula co dla JWT_SECRET i hasel kont
+      # poczatkowych. Wartosc pochodzi z pliku .env (wzorzec: .env.example).
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?ustaw POSTGRES_PASSWORD w pliku .env - openssl rand -base64 24}
     ports:
-      # Wystawiony na hosta wylacznie dla narzedzi deweloperskich;
-      # backend laczy sie po sieci kontenerow, na porcie 5432.
-      - "${DB_HOST_PORT:-5433}:5432"
+      # Publikowane na petli zwrotnej hosta, nie na wszystkich interfejsach:
+      # port bazy sluzy wylacznie narzedziom deweloperskim uruchamianym na tej
+      # samej maszynie. Bez prefiksu 127.0.0.1 Docker otwiera regule w zaporze
+      # i baza jest osiagalna z sieci - zdalnie widoczny 5432/5433 to jeden
+      # z najczesciej skanowanych portow. Backend laczy sie po sieci
+      # kontenerow, jako db:5432, i tej publikacji nie potrzebuje: wdrozenie
+      # produkcyjne cala sekcje "ports" usuwa.
+      - "127.0.0.1:${DB_HOST_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -52,7 +61,7 @@ services:
       # Nazwa hosta "db" pochodzi z nazwy uslugi - rozwiazuje ja DNS Dockera.
       DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-loyalty_db}
       DB_USERNAME: ${POSTGRES_USER:-user}
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?ustaw POSTGRES_PASSWORD w pliku .env - openssl rand -base64 24}
       # Klucz podpisu JWT nie ma wartosci domyslnej - skladnia ":?" przerywa
       # podnoszenie uslugi z komunikatem, zamiast wystartowac z kluczem znanym
       # z repozytorium. Wartosc pochodzi z pliku .env (wzorzec: .env.example).
